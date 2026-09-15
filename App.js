@@ -201,7 +201,9 @@ function render() {
       badge.classList.add(classFor(fit));
 
       card.querySelector('.job-status').textContent = job.status;
+
       card.querySelector('h3').textContent = job.title;
+
       card.querySelector('.company').textContent = job.company;
 
       const meta = card.querySelector('.job-meta');
@@ -237,8 +239,7 @@ function render() {
         });
       });
 
-      card
-        .querySelector('.delete-job')
+      card.querySelector('.delete-job')
         .addEventListener('click', () => {
           if (confirm('Remove this opportunity?')) {
             saveJobs(
@@ -311,6 +312,9 @@ function updateJob(id, changes) {
   render();
 }
 
+
+/* ADD JOB MODAL */
+
 const modal = document.querySelector('#job-modal');
 
 document
@@ -360,18 +364,318 @@ document
     render();
   });
 
-[statusFilter, fitFilter].forEach(filter => {
-  filter.addEventListener('change', render);
-});
+
+/* FILTERS */
+
+[statusFilter, fitFilter]
+  .forEach(filter => {
+    filter.addEventListener('change', render);
+  });
 
 document
   .querySelector('#clear-filters')
   .addEventListener('click', () => {
     statusFilter.value = 'all';
     fitFilter.value = 'all';
-
     render();
   });
+
+
+/* JOB SEARCH PANEL */
+
+const searchPanel =
+  document.querySelector('#search-panel');
+
+const searchStatus =
+  document.querySelector('#search-status');
+
+const searchResults =
+  document.querySelector('#search-results');
+
+document
+  .querySelectorAll('[data-open-search]')
+  .forEach(button => {
+    button.addEventListener('click', () => {
+      searchPanel.hidden = false;
+
+      searchPanel.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    });
+  });
+
+document
+  .querySelector('[data-close-search]')
+  .addEventListener('click', () => {
+    searchPanel.hidden = true;
+  });
+
+
+/*
+ * Temporary search engine.
+ *
+ * This is deliberately local for now.
+ * The next upgrade will connect this
+ * interface to a real job-search backend.
+ */
+
+const searchJobs = [
+  {
+    title: 'Head of Operations',
+    company: 'Example Challenger Bank',
+    location: 'London / Hybrid',
+    salary: '£125,000 – £145,000',
+    description:
+      'Lead operations, customer journeys, operational efficiency, governance and transformation across a growing UK digital bank.',
+    url: 'https://www.linkedin.com/jobs/',
+    status: 'Interested'
+  },
+  {
+    title: 'Head of Strategy & Transformation',
+    company: 'Example Fintech',
+    location: 'London / Hybrid',
+    salary: '£130,000 – £150,000',
+    description:
+      'Lead strategic transformation, operating model design, executive delivery and business change across a rapidly growing financial services business.',
+    url: 'https://www.linkedin.com/jobs/',
+    status: 'Interested'
+  },
+  {
+    title: 'Chief Operating Officer',
+    company: 'Example Payments Business',
+    location: 'London',
+    salary: '£150,000 – £180,000',
+    description:
+      'Own operational strategy, governance, service delivery, risk controls and scaling of a high-growth payments business.',
+    url: 'https://www.linkedin.com/jobs/',
+    status: 'Interested'
+  },
+  {
+    title: 'Director of Transformation',
+    company: 'Example Lender',
+    location: 'London / Hybrid',
+    salary: '£120,000 – £140,000',
+    description:
+      'Lead enterprise transformation, operational improvement, change delivery and operating model development within a specialist UK lender.',
+    url: 'https://www.linkedin.com/jobs/',
+    status: 'Interested'
+  }
+];
+
+function runJobSearch() {
+  const keywords =
+    document.querySelector('#search-keywords')
+      .value
+      .toLowerCase();
+
+  const location =
+    document.querySelector('#search-location')
+      .value
+      .toLowerCase();
+
+  const minimumSalary =
+    Number(
+      document.querySelector('#search-salary').value
+    ) || 0;
+
+  const sector =
+    document.querySelector('#search-sector').value;
+
+  searchStatus.textContent = 'Searching...';
+
+  searchResults.replaceChildren();
+
+  setTimeout(() => {
+
+    const results = searchJobs
+      .map(job => ({
+        ...job,
+        score: calculateFit(job)
+      }))
+      .filter(job => {
+
+        const text = [
+          job.title,
+          job.company,
+          job.description
+        ]
+          .join(' ')
+          .toLowerCase();
+
+        const keywordWords =
+          keywords
+            .split(',')
+            .map(word => word.trim())
+            .filter(Boolean);
+
+        const keywordMatch =
+          !keywordWords.length ||
+          keywordWords.some(word =>
+            text.includes(word)
+          );
+
+        const locationMatch =
+          !location ||
+          location
+            .split('/')
+            .map(item => item.trim())
+            .some(item =>
+              text.includes(item)
+            );
+
+        const salaryNumbers =
+          (job.salary.match(/\d[\d,]*/g) || [])
+            .map(value =>
+              Number(
+                value.replace(/,/g, '')
+              )
+            );
+
+        const salaryMatch =
+          salaryNumbers.some(
+            value => value >= minimumSalary
+          );
+
+        const sectorMatch =
+          sector === 'all' ||
+          (
+            sector === 'financial-services' &&
+            /(bank|fintech|payments|lender|financial)/i.test(text)
+          ) ||
+          text.includes(sector);
+
+        return (
+          keywordMatch &&
+          locationMatch &&
+          salaryMatch &&
+          sectorMatch
+        );
+      })
+      .sort((a, b) => b.score - a.score);
+
+    if (!results.length) {
+      searchResults.innerHTML =
+        '<div class="empty">No matching opportunities found. Try broadening your search.</div>';
+
+      searchStatus.textContent =
+        '0 potential matches';
+
+      return;
+    }
+
+    results.forEach(job => {
+
+      const card =
+        document.createElement('article');
+
+      card.className = 'job-card search-result-card';
+
+      const fit =
+        category(job.score);
+
+      card.innerHTML = `
+        <div class="job-main">
+          <div class="job-topline">
+            <span class="fit-badge ${classFor(fit)}">
+              ${categoryIcon(fit)} ${fit} · ${job.score}/100
+            </span>
+          </div>
+
+          <h3>${escapeHtml(job.title)}</h3>
+
+          <p class="company">
+            ${escapeHtml(job.company)}
+          </p>
+
+          <div class="job-meta">
+            <span>${escapeHtml(job.location)}</span>
+            <span>${escapeHtml(job.salary)}</span>
+          </div>
+
+          <p class="reason">
+            ${escapeHtml(
+              explanation(job, fit)
+            )}
+          </p>
+        </div>
+
+        <div class="job-actions">
+          <a
+            class="job-link"
+            href="${escapeAttribute(job.url)}"
+            target="_blank"
+            rel="noopener"
+          >
+            View role ↗
+          </a>
+
+          <button
+            class="btn btn-primary add-search-job"
+            type="button"
+          >
+            Add to pipeline
+          </button>
+        </div>
+      `;
+
+      card
+        .querySelector('.add-search-job')
+        .addEventListener('click', () => {
+
+          const newJob = {
+            ...job,
+            id: Date.now(),
+            status: 'Interested'
+          };
+
+          saveJobs([
+            ...getJobs(),
+            newJob
+          ]);
+
+          render();
+
+          card
+            .querySelector('.add-search-job')
+            .textContent = '✓ Added';
+
+          card
+            .querySelector('.add-search-job')
+            .disabled = true;
+        });
+
+      searchResults.append(card);
+    });
+
+    searchStatus.textContent =
+      `${results.length} potential match${
+        results.length === 1 ? '' : 'es'
+      } found`;
+
+  }, 400);
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function escapeAttribute(value) {
+  return String(value)
+    .replace(/"/g, '&quot;');
+}
+
+document
+  .querySelector('#find-jobs-button')
+  .addEventListener('click', runJobSearch);
+
+
+/* START */
 
 initialise();
 render();
