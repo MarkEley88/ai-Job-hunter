@@ -679,3 +679,9 @@ document
 
 initialise();
 render();
+
+const searchButton = document.querySelector('#find-jobs-button');
+
+if (searchButton) {
+  searchButton.addEventListener('click', runJobSearch);
+}
