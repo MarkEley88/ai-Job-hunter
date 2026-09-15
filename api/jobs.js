@@ -1,4 +1,12 @@
 export default async function handler(request, response) {
+  response.setHeader('Access-Control-Allow-Origin', 'https://markeley88.github.io');
+  response.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (request.method === 'OPTIONS') {
+    return response.status(204).end();
+  }
+
   const { ADZUNA_APP_ID, ADZUNA_APP_KEY } = process.env;
 
   if (!ADZUNA_APP_ID || !ADZUNA_APP_KEY) {
@@ -21,11 +29,14 @@ export default async function handler(request, response) {
   url.searchParams.set('sort_by', 'date');
   url.searchParams.set('content-type', 'application/json');
 
-  // For the user's normal "UK / London / Hybrid" search, London is used as
-  // the geographic filter. If they enter a more specific location, use it.
-  if (whereInput && !/^(uk|united kingdom|uk\s*\/\s*london\s*\/\s*hybrid)$/i.test(whereInput)) {
+  if (
+    whereInput &&
+    !/^(uk|united kingdom|uk\s*\/\s*london\s*\/\s*hybrid)$/i.test(whereInput)
+  ) {
     const where = whereInput.split('/')[0].trim();
-    if (where) url.searchParams.set('where', where);
+    if (where) {
+      url.searchParams.set('where', where);
+    }
   } else if (/london/i.test(whereInput)) {
     url.searchParams.set('where', 'london');
   }
@@ -70,8 +81,15 @@ export default async function handler(request, response) {
 
 function formatSalary(min, max) {
   const values = [min, max].filter(value => Number(value) > 0);
-  if (!values.length) return 'Salary not disclosed';
-  if (values.length === 1) return `£${Math.round(values[0]).toLocaleString('en-GB')}`;
+
+  if (!values.length) {
+    return 'Salary not disclosed';
+  }
+
+  if (values.length === 1) {
+    return `£${Math.round(values[0]).toLocaleString('en-GB')}`;
+  }
+
   return `£${Math.round(values[0]).toLocaleString('en-GB')} – £${Math.round(values[1]).toLocaleString('en-GB')}`;
 }
 
