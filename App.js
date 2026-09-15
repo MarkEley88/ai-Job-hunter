@@ -670,11 +670,6 @@ function escapeAttribute(value) {
     .replace(/"/g, '&quot;');
 }
 
-document
-  .querySelector('#find-jobs-button')
-  .addEventListener('click', runJobSearch);
-
-
 /* START */
 
 initialise();
