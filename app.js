@@ -1,5 +1,7 @@
 const STORAGE_KEY = 'ai-job-hunter-jobs-v1';
 
+const API_URL = 'https://ai-job-hunter-vert.vercel.app/api/jobs';
+
 const samples = [
   {
     title: 'Head of Transformation',
@@ -9,7 +11,8 @@ const samples = [
     bonus: '20% bonus + pension',
     url: 'https://www.atombank.co.uk/careers/',
     status: 'Interested',
-    description: 'Lead enterprise-wide transformation, strategic delivery and operating model change in a digital challenger bank.'
+    description:
+      'Lead enterprise-wide transformation, strategic delivery and operating model change in a digital challenger bank.'
   },
   {
     title: 'Director of Operations',
@@ -19,7 +22,8 @@ const samples = [
     bonus: 'Bonus + 10% pension',
     url: 'https://careers.zopa.com/',
     status: 'Applied',
-    description: 'Own customer operations, servicing performance, controls and operational excellence across a rapidly growing digital bank.'
+    description:
+      'Own customer operations, servicing performance, controls and operational excellence across a rapidly growing digital bank.'
   },
   {
     title: 'Head of Change Delivery',
@@ -29,27 +33,8 @@ const samples = [
     bonus: '15% bonus',
     url: 'https://www.shawbrook.co.uk/careers/',
     status: 'Interview',
-    description: 'Shape the change portfolio and lead cross-functional delivery for a specialist savings and lending bank.'
-  },
-  {
-    title: 'Chief Operating Officer',
-    company: 'Payments scale-up',
-    location: 'London',
-    salary: '£150,000 – £180,000',
-    bonus: 'Equity + bonus',
-    url: 'https://www.linkedin.com/jobs/',
-    status: 'Interested',
-    description: 'Build scalable operational infrastructure, governance and service delivery for a high-growth payments business.'
-  },
-  {
-    title: 'Senior Project Manager',
-    company: 'RetailCo',
-    location: 'Manchester',
-    salary: '£70,000',
-    bonus: '',
-    url: 'https://www.linkedin.com/jobs/',
-    status: 'Rejected',
-    description: 'Manage retail technology projects and supplier delivery.'
+    description:
+      'Shape the change portfolio and lead cross-functional delivery for a specialist savings and lending bank.'
   }
 ];
 
@@ -60,7 +45,9 @@ function calculateFit(job) {
     job.location,
     job.description,
     job.salary
-  ].join(' ').toLowerCase();
+  ]
+    .join(' ')
+    .toLowerCase();
 
   let score = 20;
 
@@ -69,30 +56,40 @@ function calculateFit(job) {
       'head of operations',
       'head of transformation',
       'head of change',
-      'strategy',
+      'head of strategy',
+      'strategy & transformation',
+      'strategy and transformation',
       'coo',
-      'chief operating',
+      'chief operating officer',
+      'chief transformation officer',
       'director of operations',
       'director of transformation',
-      'change delivery'
+      'director of change',
+      'change delivery',
+      'transformation director',
+      'operations director'
     ].some(word => text.includes(word))
   ) {
     score += 35;
   }
 
   if (
-    /(bank|fintech|payments|lender|financial services|finance|mortgage|savings)/.test(text)
+    /(bank|fintech|payments|lender|financial services|financial|mortgage|savings|credit|insurance)/.test(
+      text
+    )
   ) {
     score += 22;
   }
 
-  if (/(london|hybrid|uk|remote|durham)/.test(text)) {
+  if (
+    /(london|uk|united kingdom|hybrid|remote|england)/.test(text)
+  ) {
     score += 8;
   }
 
-  const numbers = (
-    String(job.salary || '').match(/\d[\d,]*/g) || []
-  ).map(value => Number(value.replace(/,/g, '')));
+  const numbers = (job.salary || '')
+    .match(/\d[\d,]*/g)
+    ?.map(value => Number(value.replace(/,/g, ''))) || [];
 
   if (numbers.some(value => value >= 120000)) {
     score += 15;
@@ -101,16 +98,30 @@ function calculateFit(job) {
   }
 
   if (
-    /(lead|enterprise|strategic|operating model|governance|executive)/.test(text)
+    /(lead|enterprise|strategic|operating model|governance|executive|customer operations|operational excellence)/.test(
+      text
+    )
   ) {
     score += 7;
   }
 
   if (
-    /(project manager|junior|analyst|retail)/.test(text) &&
-    !/(bank|fintech|payments)/.test(text)
+    /(project manager|junior|analyst|administrator|support technician|helpdesk|developer|software engineer|retail assistant)/.test(
+      text
+    )
   ) {
-    score -= 25;
+    score -= 30;
+  }
+
+  if (
+    /(it operations|technical support|infrastructure|devops|data engineer|software development)/.test(
+      text
+    ) &&
+    !/(head of operations|chief operating officer|coo|director of operations)/.test(
+      text
+    )
+  ) {
+    score -= 20;
   }
 
   return Math.max(0, Math.min(100, score));
@@ -158,7 +169,7 @@ function initialise() {
     saveJobs(
       samples.map((job, index) => ({
         ...job,
-        id: Date.now() + index,
+        id: `sample-${Date.now()}-${index}`,
         score: calculateFit(job)
       }))
     );
@@ -170,35 +181,15 @@ const template = document.querySelector('#job-template');
 const statusFilter = document.querySelector('#status-filter');
 const fitFilter = document.querySelector('#fit-filter');
 
-function explanation(job, fit) {
-  const sector = /(bank|fintech|payments|lender|financial)/i.test(
-    [job.company, job.description].join(' ')
-  );
-
-  if (fit === 'Excellent') {
-    return 'Exceptional alignment: senior leadership scope, financial-services relevance and compensation meet your core criteria.';
-  }
-
-  if (fit === 'Strong') {
-    return `Strong match with clear operational or transformation relevance${
-      sector ? ' in your target financial-services market.' : '.'
-    }`;
-  }
-
-  if (fit === 'Possible') {
-    return 'Some relevant signals, but review the seniority, sector focus or package before prioritising.';
-  }
-
-  return 'Limited alignment with your target senior leadership roles, financial-services focus or salary threshold.';
-}
-
 function render() {
   const jobs = getJobs();
 
   const visible = jobs.filter(
     job =>
-      (statusFilter.value === 'all' || job.status === statusFilter.value) &&
-      (fitFilter.value === 'all' || category(job.score) === fitFilter.value)
+      (statusFilter.value === 'all' ||
+        job.status === statusFilter.value) &&
+      (fitFilter.value === 'all' ||
+        category(job.score) === fitFilter.value)
   );
 
   jobList.replaceChildren();
@@ -212,8 +203,8 @@ function render() {
     .sort((a, b) => b.score - a.score)
     .forEach(job => {
       const card = template.content.cloneNode(true);
-      const fit = category(job.score);
 
+      const fit = category(job.score);
       const badge = card.querySelector('.fit-badge');
 
       badge.textContent =
@@ -221,13 +212,22 @@ function render() {
 
       badge.classList.add(classFor(fit));
 
-      card.querySelector('.job-status').textContent = job.status;
-      card.querySelector('h3').textContent = job.title;
-      card.querySelector('.company').textContent = job.company;
+      card.querySelector('.job-status').textContent =
+        job.status || 'Interested';
+
+      card.querySelector('h3').textContent =
+        job.title || 'Untitled role';
+
+      card.querySelector('.company').textContent =
+        job.company || 'Unknown company';
 
       const meta = card.querySelector('.job-meta');
 
-      [job.location, job.salary, job.bonus]
+      [
+        job.location,
+        job.salary,
+        job.bonus
+      ]
         .filter(Boolean)
         .forEach(value => {
           const item = document.createElement('span');
@@ -242,6 +242,8 @@ function render() {
 
       if (job.url) {
         link.href = job.url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
       } else {
         link.removeAttribute('href');
         link.textContent = 'No URL added';
@@ -250,7 +252,7 @@ function render() {
 
       const select = card.querySelector('.status-select');
 
-      select.value = job.status;
+      select.value = job.status || 'Interested';
 
       select.addEventListener('change', () => {
         updateJob(job.id, {
@@ -263,7 +265,9 @@ function render() {
         .addEventListener('click', () => {
           if (confirm('Remove this opportunity?')) {
             saveJobs(
-              getJobs().filter(item => item.id !== job.id)
+              getJobs().filter(
+                item => item.id !== job.id
+              )
             );
 
             render();
@@ -273,23 +277,59 @@ function render() {
       jobList.append(card);
     });
 
-  document.querySelector('#job-count').textContent = jobs.length;
+  document.querySelector('#job-count').textContent =
+    jobs.length;
 
   document.querySelector('#excellent-count').textContent =
-    jobs.filter(job => category(job.score) === 'Excellent').length;
+    jobs.filter(
+      job => category(job.score) === 'Excellent'
+    ).length;
 
   document.querySelector('#active-count').textContent =
-    jobs.filter(job =>
-      ['Applied', 'Interview'].includes(job.status)
+    jobs.filter(
+      job =>
+        ['Applied', 'Interview'].includes(
+          job.status
+        )
     ).length;
 
   document.querySelector('#average-fit').textContent =
     jobs.length
       ? Math.round(
-          jobs.reduce((sum, job) => sum + job.score, 0) /
-            jobs.length
+          jobs.reduce(
+            (sum, job) => sum + job.score,
+            0
+          ) / jobs.length
         )
       : 0;
+}
+
+function explanation(job, fit) {
+  const sector =
+    /(bank|fintech|payments|lender|financial|mortgage|credit)/i.test(
+      [
+        job.company,
+        job.description
+      ].join(' ')
+    );
+
+  if (fit === 'Excellent') {
+    return 'Exceptional alignment: senior leadership scope, financial-services relevance and compensation meet your core criteria.';
+  }
+
+  if (fit === 'Strong') {
+    return `Strong match with clear operational or transformation relevance${
+      sector
+        ? ' in your target financial-services market.'
+        : '.'
+    }`;
+  }
+
+  if (fit === 'Possible') {
+    return 'Some relevant signals, but review the seniority, sector focus or package before prioritising.';
+  }
+
+  return 'Limited alignment with your target senior leadership roles, financial-services focus or salary threshold.';
 }
 
 function updateJob(id, changes) {
@@ -304,23 +344,28 @@ function updateJob(id, changes) {
   render();
 }
 
+
+// -----------------------------
+// ADD OPPORTUNITY
+// -----------------------------
+
 const modal = document.querySelector('#job-modal');
 
 document
   .querySelectorAll('[data-open-modal]')
-  .forEach(button => {
-    button.addEventListener('click', () => {
-      modal.showModal();
-    });
-  });
+  .forEach(button =>
+    button.addEventListener('click', () =>
+      modal.showModal()
+    )
+  );
 
 document
   .querySelectorAll('[data-close-modal]')
-  .forEach(button => {
-    button.addEventListener('click', () => {
-      modal.close();
-    });
-  });
+  .forEach(button =>
+    button.addEventListener('click', () =>
+      modal.close()
+    )
+  );
 
 document
   .querySelector('#job-form')
@@ -333,7 +378,7 @@ document
 
     const job = {
       ...data,
-      id: Date.now()
+      id: `manual-${Date.now()}`
     };
 
     job.score = calculateFit(job);
@@ -344,7 +389,6 @@ document
     ]);
 
     event.currentTarget.reset();
-
     modal.close();
 
     statusFilter.value = 'all';
@@ -353,9 +397,202 @@ document
     render();
   });
 
-[statusFilter, fitFilter].forEach(filter => {
-  filter.addEventListener('change', render);
+
+// -----------------------------
+// LIVE JOB SEARCH
+// -----------------------------
+
+const searchPanel =
+  document.querySelector('#search-panel');
+
+const openSearchButtons =
+  document.querySelectorAll('[data-open-search]');
+
+const findJobsButton =
+  document.querySelector('#find-jobs-button');
+
+const searchStatus =
+  document.querySelector('#search-status');
+
+const searchResults =
+  document.querySelector('#search-results');
+
+openSearchButtons.forEach(button => {
+  button.addEventListener('click', () => {
+    searchPanel.hidden = !searchPanel.hidden;
+
+    if (!searchPanel.hidden) {
+      searchPanel.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }
+  });
 });
+
+async function searchJobs() {
+  const keywords =
+    document.querySelector('#search-keywords')
+      ?.value.trim() ||
+    'Head of Operations';
+
+  const location =
+    document.querySelector('#search-location')
+      ?.value.trim() ||
+    'London';
+
+  const salary =
+    Number(
+      document.querySelector('#search-salary')
+        ?.value || 120000
+    );
+
+  findJobsButton.disabled = true;
+
+  searchStatus.textContent =
+    'Searching Adzuna for matching roles…';
+
+  searchResults.innerHTML = '';
+
+  try {
+    const url =
+      `${API_URL}?keywords=${encodeURIComponent(
+        keywords
+      )}&location=${encodeURIComponent(
+        location
+      )}&salary=${encodeURIComponent(
+        salary
+      )}`;
+
+    const response = await fetch(url);
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.error ||
+          'The job search failed.'
+      );
+    }
+
+    const incomingJobs =
+      (data.jobs || []).map(job => ({
+        ...job,
+        status: 'Interested',
+        score: calculateFit(job)
+      }));
+
+    if (!incomingJobs.length) {
+      searchStatus.textContent =
+        'No matching jobs were found. Try broader keywords or a lower salary threshold.';
+
+      return;
+    }
+
+    // Add new jobs without creating duplicates
+    const existingJobs = getJobs();
+
+    const existingUrls = new Set(
+      existingJobs
+        .map(job => job.url)
+        .filter(Boolean)
+    );
+
+    const newJobs =
+      incomingJobs.filter(
+        job =>
+          job.url &&
+          !existingUrls.has(job.url)
+      );
+
+    saveJobs([
+      ...existingJobs,
+      ...newJobs
+    ]);
+
+    statusFilter.value = 'all';
+    fitFilter.value = 'all';
+
+    render();
+
+    const excellent =
+      newJobs.filter(
+        job =>
+          category(job.score) ===
+          'Excellent'
+      ).length;
+
+    const strong =
+      newJobs.filter(
+        job =>
+          category(job.score) ===
+          'Strong'
+      ).length;
+
+    searchStatus.textContent =
+      `Found ${incomingJobs.length} jobs. Added ${newJobs.length} new opportunities — ${excellent} Excellent and ${strong} Strong matches.`;
+
+    searchResults.innerHTML = `
+      <div class="search-summary">
+        <strong>${incomingJobs.length}</strong>
+        roles found from Adzuna.
+        <strong>${newJobs.length}</strong>
+        were new to your dashboard.
+      </div>
+    `;
+
+  } catch (error) {
+    console.error(error);
+
+    searchStatus.textContent =
+      'Search failed. Please try again.';
+
+    searchResults.innerHTML = `
+      <div class="empty">
+        ${escapeHtml(
+          error.message ||
+            'Unable to search for jobs.'
+        )}
+      </div>
+    `;
+  } finally {
+    findJobsButton.disabled = false;
+  }
+}
+
+if (findJobsButton) {
+  findJobsButton.addEventListener(
+    'click',
+    searchJobs
+  );
+}
+
+
+// -----------------------------
+// HELPERS
+// -----------------------------
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+
+// -----------------------------
+// FILTERS
+// -----------------------------
+
+[statusFilter, fitFilter].forEach(
+  filter =>
+    filter.addEventListener(
+      'change',
+      render
+    )
+);
 
 document
   .querySelector('#clear-filters')
@@ -365,262 +602,10 @@ document
     render();
   });
 
-/* =========================
-   LIVE JOB SEARCH
-   ========================= */
 
-const searchPanel =
-  document.querySelector('#search-panel');
-
-const searchStatus =
-  document.querySelector('#search-status');
-
-const searchResults =
-  document.querySelector('#search-results');
-
-document
-  .querySelectorAll('[data-open-search]')
-  .forEach(button => {
-    button.addEventListener('click', () => {
-      searchPanel.hidden = false;
-
-      searchPanel.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start'
-      });
-    });
-  });
-
-const closeSearchButton =
-  document.querySelector('[data-close-search]');
-
-if (closeSearchButton) {
-  closeSearchButton.addEventListener('click', () => {
-    searchPanel.hidden = true;
-  });
-}
-
-async function runJobSearch() {
-  const keywords =
-    document.querySelector('#search-keywords')
-      .value
-      .trim();
-
-  const location =
-    document.querySelector('#search-location')
-      .value
-      .trim();
-
-  const minimumSalary =
-    Number(
-      document.querySelector('#search-salary').value
-    ) || 0;
-
-  const sector =
-    document.querySelector('#search-sector').value;
-
-  searchStatus.textContent =
-    'Searching live UK vacancies...';
-
-  searchResults.replaceChildren();
-
-  try {
-    const query = new URLSearchParams({
-      keywords,
-      location,
-      salary: String(minimumSalary),
-      sector
-    });
-
-    /*
-      IMPORTANT:
-      The front end is hosted on GitHub Pages.
-      The secure Adzuna API connection is hosted on Vercel.
-    */
-
-    const response = await fetch(
-      `https://ai-job-hunter-vert.vercel.app/api/jobs?${query.toString()}`
-    );
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        data.error || 'Job search failed.'
-      );
-    }
-
-    const results =
-      (data.jobs || [])
-        .map(job => ({
-          ...job,
-          score: calculateFit(job)
-        }))
-        .sort(
-          (a, b) => b.score - a.score
-        );
-
-    if (!results.length) {
-      searchResults.innerHTML =
-        '<div class="empty">No live matching opportunities found. Try broadening your search.</div>';
-
-      searchStatus.textContent =
-        '0 live matches';
-
-      return;
-    }
-
-    results.forEach(job => {
-      const card =
-        document.createElement('article');
-
-      card.className =
-        'job-card search-result-card';
-
-      const fit =
-        category(job.score);
-
-      card.innerHTML = `
-        <div class="job-main">
-          <div class="job-topline">
-            <span class="fit-badge ${classFor(fit)}">
-              ${categoryIcon(fit)} ${fit} · ${job.score}/100
-            </span>
-          </div>
-
-          <h3>${escapeHtml(job.title)}</h3>
-
-          <p class="company">
-            ${escapeHtml(job.company)}
-          </p>
-
-          <div class="job-meta">
-            <span>${escapeHtml(job.location)}</span>
-            <span>${escapeHtml(job.salary)}</span>
-          </div>
-
-          <p class="reason">
-            ${escapeHtml(
-              explanation(job, fit)
-            )}
-          </p>
-        </div>
-
-        <div class="job-actions">
-          <a
-            class="job-link"
-            href="${escapeAttribute(job.url)}"
-            target="_blank"
-            rel="noopener"
-          >
-            View role ↗
-          </a>
-
-          <button
-            class="btn btn-primary add-search-job"
-            type="button"
-          >
-            Add to pipeline
-          </button>
-        </div>
-      `;
-
-      const addButton =
-        card.querySelector('.add-search-job');
-
-      addButton.addEventListener(
-        'click',
-        () => {
-          const existingJobs = getJobs();
-
-          const alreadyAdded =
-            existingJobs.some(
-              existing =>
-                existing.url &&
-                job.url &&
-                existing.url === job.url
-            );
-
-          if (alreadyAdded) {
-            addButton.textContent =
-              '✓ Already added';
-
-            addButton.disabled = true;
-
-            return;
-          }
-
-          saveJobs([
-            ...existingJobs,
-            {
-              ...job,
-              id: Date.now(),
-              status: 'Interested'
-            }
-          ]);
-
-          render();
-
-          addButton.textContent =
-            '✓ Added';
-
-          addButton.disabled = true;
-        }
-      );
-
-      searchResults.append(card);
-    });
-
-    searchStatus.textContent =
-      `${results.length} live match${
-        results.length === 1 ? '' : 'es'
-      } found`;
-
-  } catch (error) {
-    console.error(
-      'Live job search error:',
-      error
-    );
-
-    searchResults.innerHTML =
-      '<div class="empty">The live job search could not be completed. Check the Vercel deployment and Adzuna connection, then try again.</div>';
-
-    searchStatus.textContent =
-      'Search error';
-  }
-}
-
-/* =========================
-   SECURITY / HTML HELPERS
-   ========================= */
-
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
-function escapeAttribute(value) {
-  return String(value ?? '')
-    .replace(/"/g, '&quot;');
-}
-
-/* =========================
-   START APP
-   ========================= */
+// -----------------------------
+// START APP
+// -----------------------------
 
 initialise();
 render();
-
-const searchButton =
-  document.querySelector('#find-jobs-button');
-
-if (searchButton) {
-  searchButton.addEventListener(
-    'click',
-    runJobSearch
-  );
-       }
