@@ -17,15 +17,15 @@ async function handler(req, res) {
   const locationRaw = String(q.location || 'London');
   const where = /uk/i.test(locationRaw) ? 'London' : locationRaw.split('/')[0].trim();
 
+  // Keep the upstream request count deliberately low. The previous fan-out could trigger
+  // Adzuna's rate limit and also made the search unnecessarily slow.
   const terms = [...new Set([
     ...requested,
-    'Head of Operations', 'Director of Operations', 'COO',
-    'Head of Transformation', 'Transformation Director', 'Head of Change',
-    'Head of Business Operations', 'Director of Change', 'Director of Transformation'
-  ])].slice(0, 8);
+    'Head of Operations', 'Head of Transformation', 'COO', 'Head of Change'
+  ])].slice(0, 4);
 
   const senior = /\b(head|director|chief|vp|vice president|managing director|executive director)\b/i;
-  const target = /\b(head of operations|director of operations|operations director|chief operating officer|coo|head of transformation|transformation director|head of change|chief transformation officer|head of strategy.{0,25}transformation|head of business operations|head of operational excellence|director of change|director of transformation)\b/i;
+  const target = /\b(head of operations|director of operations|operations director|chief operating officer|coo|head of transformation|transformation director|head of change|change director|chief transformation officer|head of strategy.{0,25}transformation|head of business operations|head of operational excellence|director of change|director of transformation)\b/i;
   const related = /\b(head of service delivery|head of customer operations|head of operational change|head of continuous improvement|head of operating model|director of service delivery|director of customer operations|director of operational excellence|director of business change|director of change delivery|director of transformation delivery|chief of staff|head of strategy.{0,25}(operations|change|delivery))\b/i;
   const remit = /\b(operations?|operational excellence|operating model|service delivery|customer operations|business operations|process(?:es)?|controls?|servicing|change|transformation|continuous improvement|target operating model)\b/i;
   const finance = /\b(bank|banking|fintech|payments?|lender|lending|financial services?|mortgage|savings|credit|insurance|insurtech|consumer finance|wealth|asset management|regulated)\b/i;
@@ -58,8 +58,6 @@ async function handler(req, res) {
     return Math.max(0, Math.min(100, s));
   };
 
-  // Keep senior target/adjacent roles even when the job description does not mention finance.
-  // Finance is a ranking signal rather than a hard requirement, because aggregator descriptions are often sparse.
   const relevant = j => {
     const title = String(j.title || '');
     const t = `${title} ${j.description || ''}`;
@@ -72,7 +70,7 @@ async function handler(req, res) {
   const results = [];
   const errors = [];
   const add = rows => rows.forEach(j => {
-    if (!j.title) return;
+    if (!j || !j.title) return;
     const key = `${String(j.company).toLowerCase()}|${String(j.title).toLowerCase()}`;
     const old = results.find(x => `${String(x.company).toLowerCase()}|${String(x.title).toLowerCase()}` === key);
     if (!old) {
@@ -83,12 +81,21 @@ async function handler(req, res) {
     }
   });
 
+  async function readJson(r, source) {
+    const text = await r.text();
+    if (!r.ok) throw new Error(`${source} ${r.status}`);
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(`${source} returned non-JSON (${r.status})`);
+    }
+  }
+
   async function adzuna(term) {
     const p = new URLSearchParams({ app_id: appId, app_key: appKey, results_per_page: '50', what: term, sort_by: 'date' });
     if (where) p.set('where', where);
     const r = await fetch('https://api.adzuna.com/v1/api/jobs/gb/search/1?' + p.toString(), { headers: { Accept: 'application/json' } });
-    if (!r.ok) throw new Error(`Adzuna ${r.status}`);
-    const d = await r.json();
+    const d = await readJson(r, 'Adzuna');
     return (d.results || []).map(x => ({
       title: x.title, company: x.company?.display_name || 'Unknown company', location: x.location?.display_name || 'UK',
       salary: money(x.salary_min, x.salary_max), salaryMin: x.salary_min ?? null, salaryMax: x.salary_max ?? null,
@@ -102,8 +109,7 @@ async function handler(req, res) {
       method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ keywords: terms.join(', '), location: where || 'London', page: 1, ResultOnPage: 100 })
     });
-    if (!r.ok) throw new Error(`Jooble ${r.status}`);
-    const d = await r.json();
+    const d = await readJson(r, 'Jooble');
     return (d.jobs || []).map(x => ({
       title: x.title, company: x.company || 'Unknown company', location: x.location || 'UK', salary: x.salary || 'Salary not disclosed',
       salaryMin: null, salaryMax: null, url: x.link || '', description: clean(x.snippet), created: x.updated || '', source: 'Jooble'
@@ -116,8 +122,7 @@ async function handler(req, res) {
     if (where) p.set('locationName', where);
     const auth = Buffer.from(`${reedKey}:`).toString('base64');
     const r = await fetch('https://www.reed.co.uk/api/1.0/search?' + p.toString(), { headers: { Authorization: `Basic ${auth}`, Accept: 'application/json' } });
-    if (!r.ok) throw new Error(`Reed ${r.status}`);
-    const d = await r.json();
+    const d = await readJson(r, 'Reed');
     const rows = Array.isArray(d) ? d : d.results || [];
     return rows.map(x => ({
       title: x.jobTitle || x.title, company: x.employerName || x.employer || 'Unknown company', location: x.locationName || x.location || 'UK',
@@ -127,14 +132,21 @@ async function handler(req, res) {
   }
 
   try {
-    // Fewer Adzuna/Reed queries reduces rate limiting while retaining broad coverage.
-    const tasks = [
-      ...terms.map(adzuna),
-      jooble(),
-      ...(reedKey ? terms.map(reed) : [])
-    ];
-    const settled = await Promise.allSettled(tasks);
-    settled.forEach(x => x.status === 'fulfilled' ? add(x.value) : errors.push(x.reason?.message || String(x.reason)));
+    // Run Adzuna sequentially so one search cannot immediately trigger a burst of 429s.
+    // Jooble/Reed remain independent; a failed source is reported but does not kill the search.
+    for (const term of terms) {
+      try { add(await adzuna(term)); }
+      catch (e) { errors.push(e?.message || String(e)); }
+    }
+
+    try { add(await jooble()); }
+    catch (e) { errors.push(e?.message || String(e)); }
+
+    if (reedKey) {
+      // One Reed query is enough for now; the key is not required for the core search.
+      try { add(await reed('Head of Operations OR Head of Transformation OR COO')); }
+      catch (e) { errors.push(e?.message || String(e)); }
+    }
 
     const ranked = results
       .filter(relevant)
