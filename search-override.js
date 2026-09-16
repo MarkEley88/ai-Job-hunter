@@ -1,16 +1,11 @@
 (() => {
-  // Reliable search: try the newest endpoint first, then fall back to the previous
-  // endpoints so a Vercel deployment/API hiccup never leaves the user with a generic error.
+  // The live Vercel project serves /api/jobs. Keep the browser on that known-live route.
   const button = document.querySelector('#find-jobs-button');
   if (!button) return;
   const replacement = button.cloneNode(true);
   button.replaceWith(replacement);
 
-  const API_URLS = [
-    'https://ai-job-hunter-vert.vercel.app/api/jobs3',
-    'https://ai-job-hunter-vert.vercel.app/api/jobs2',
-    'https://ai-job-hunter-vert.vercel.app/api/jobs'
-  ];
+  const API_URL = 'https://ai-job-hunter-vert.vercel.app/api/jobs';
   const searchStatus = document.querySelector('#search-status');
   const searchResults = document.querySelector('#search-results');
   const statusFilter = document.querySelector('#status-filter');
@@ -44,55 +39,33 @@
     return result;
   }
 
-  async function callApi(url, params) {
-    const response = await fetch(`${url}?${params.toString()}`, { cache: 'no-store' });
-    if (!response.ok) throw new Error(`${url.split('/').pop()} returned HTTP ${response.status}`);
-    return response.json();
-  }
-
   replacement.addEventListener('click', async () => {
     const location=document.querySelector('#search-location').value.trim();
     const userKeywords=document.querySelector('#search-keywords').value.split(',').map(x=>x.trim()).filter(Boolean);
     const keywords=[...new Set([...userKeywords,...broadTitles])];
     replacement.disabled=true;
-    searchStatus.textContent=`Searching ${keywords.length} leadership title variations across the available sources…`;
+    searchStatus.textContent=`Searching ${keywords.length} leadership title variations across Adzuna, Jooble and Reed…`;
     searchResults.replaceChildren();
 
     const params=new URLSearchParams({keywords:keywords.join(', '),location,minSalary:'0'});
-    let data=null;
-    const apiErrors=[];
-
     try {
-      for (const apiUrl of API_URLS) {
-        try {
-          data=await callApi(apiUrl, params);
-          if (Array.isArray(data.jobs) && data.jobs.length) break;
-          apiErrors.push(`${apiUrl.split('/').pop()}: 0 jobs`);
-        } catch (error) {
-          apiErrors.push(error.message);
-        }
-      }
-
-      const jobs=Array.isArray(data?.jobs)?data.jobs:[];
-      if (!jobs.length) {
-        searchStatus.textContent=`No suitable leadership roles returned. API status: ${apiErrors.join(' | ')}`;
+      const response=await fetch(`${API_URL}?${params.toString()}`,{cache:'no-store'});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok) throw new Error(`/api/jobs returned HTTP ${response.status}${data.error?`: ${data.error}`:''}`);
+      const jobs=Array.isArray(data.jobs)?data.jobs:[];
+      if(!jobs.length){
+        const sourceErrors=Array.isArray(data.sourceErrors)&&data.sourceErrors.length?` Source issues: ${data.sourceErrors.join(' | ')}`:'';
+        searchStatus.textContent=`No suitable leadership roles returned.${sourceErrors}`;
         return;
       }
-
       const enriched=jobs.map(job=>({...job,id:job.id||`job-${Date.now()}-${Math.random().toString(36).slice(2)}`,status:job.status||'Interested',score:typeof job.relevanceScore==='number'?job.relevanceScore:(job.score||0)}));
       save(merge(jobsStore(),enriched));
-      statusFilter.value='all';
-      fitFilter.value='all';
-      statusFilter.dispatchEvent(new Event('change'));
-
+      statusFilter.value='all'; fitFilter.value='all'; statusFilter.dispatchEvent(new Event('change'));
       const sourceText=Array.isArray(data.sources)?data.sources.join(' + '):'available sources';
-      const errors=Array.isArray(data.sourceErrors)&&data.sourceErrors.length?` (${data.sourceErrors.length} source issue${data.sourceErrors.length===1?'':'s'})`:'';
-      searchStatus.textContent=`${enriched.length} relevant leadership roles found across ${sourceText}${errors}.`;
-    } catch(error) {
+      searchStatus.textContent=`${enriched.length} relevant leadership roles found across ${sourceText}.`;
+    }catch(error){
       console.error(error);
       searchStatus.textContent=`Search API error: ${error.message}.`;
-    } finally {
-      replacement.disabled=false;
-    }
+    }finally{replacement.disabled=false;}
   });
 })();
