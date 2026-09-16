@@ -5,110 +5,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="Personal AI Job Hunter dashboard" />
   <title>AI Job Hunter</title>
-
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="description.css" />
 </head>
 <body>
   <header class="topbar">
     <a class="brand" href="#top" aria-label="AI Job Hunter home"><span class="brand-mark">A</span><span>AI Job Hunter</span></a>
-    <div class="topbar-actions">
-      <span class="saved-state"><span class="live-dot"></span>Saved locally</span>
-      <button class="btn btn-primary" type="button" data-open-search>🔎 Find jobs</button>
-      <button class="btn btn-primary" type="button" data-open-modal>+ Add opportunity</button>
-    </div>
+    <div class="topbar-actions"><span class="saved-state"><span class="live-dot"></span>Saved locally</span><button class="btn btn-primary" type="button" data-open-search>🔎 Find jobs</button><button class="btn btn-primary" type="button" data-open-modal>+ Add opportunity</button></div>
   </header>
-
   <main id="top" class="page-shell">
-    <section class="hero">
-      <div>
-        <p class="eyebrow">Personal opportunity radar</p>
-        <h1>Your next leadership move,<br><em>made clearer.</em></h1>
-        <p class="hero-copy">A focused view of senior operations and transformation roles across UK financial services.</p>
-      </div>
-      <div class="profile-card">
-        <div class="profile-title"><span class="profile-icon">✦</span><span>Career profile</span></div>
-        <p><strong>Head of Projects</strong><br>UK challenger bank</p>
-        <div class="profile-stat"><span>Salary target</span><strong>£120k+ base</strong></div>
-      </div>
-    </section>
-
-    <section id="search-panel" class="search-panel" hidden>
-      <div class="search-panel-header"><div><p class="eyebrow">AI-powered search</p><h2>Find your next role</h2></div><button class="icon-button" type="button" data-close-search aria-label="Close job search">×</button></div>
-      <p class="search-intro">Search for senior operations, transformation, change and COO opportunities across UK financial services.</p>
-      <div class="search-grid">
-        <label class="field"><span>Keywords</span><input id="search-keywords" type="text" value="Head of Operations, Head of Transformation, COO" placeholder="e.g. Head of Operations" /></label>
-        <label class="field"><span>Location</span><input id="search-location" type="text" value="UK / London / Hybrid" placeholder="e.g. London" /></label>
-        <label class="field"><span>Minimum salary</span><input id="search-salary" type="number" value="120000" placeholder="120000" /></label>
-        <label class="field"><span>Sector</span><select id="search-sector"><option value="financial-services">Financial services</option><option value="banking">Banking</option><option value="fintech">Fintech</option><option value="payments">Payments</option><option value="lending">Lending</option><option value="all">All sectors</option></select></label>
-      </div>
-      <div class="search-actions"><button class="btn btn-primary" id="find-jobs-button" type="button">🔎 Find matching jobs</button><span class="search-status" id="search-status"></span></div>
-      <div id="search-results" class="search-results"></div>
-    </section>
-
-    <section class="metrics" aria-label="Opportunity summary">
-      <article><span class="metric-label">Opportunities</span><strong id="job-count">0</strong><span class="metric-detail">roles in your pipeline</span></article>
-      <article><span class="metric-label">Excellent fit</span><strong id="excellent-count">0</strong><span class="metric-detail">worth prioritising now</span></article>
-      <article><span class="metric-label">In motion</span><strong id="active-count">0</strong><span class="metric-detail">applied or interviewing</span></article>
-      <article><span class="metric-label">Average fit</span><strong id="average-fit">0</strong><span class="metric-detail">across visible roles</span></article>
-    </section>
-
+    <section class="hero"><div><p class="eyebrow">Personal opportunity radar</p><h1>Your next leadership move,<br><em>made clearer.</em></h1><p class="hero-copy">A focused view of senior operations and transformation roles across UK financial services.</p></div><div class="profile-card"><div class="profile-title"><span class="profile-icon">✦</span><span>Career profile</span></div><p><strong>Head of Projects</strong><br>UK challenger bank</p><div class="profile-stat"><span>Salary target</span><strong>£120k+ base</strong></div></div></section>
+    <section id="search-panel" class="search-panel" hidden><div class="search-panel-header"><div><p class="eyebrow">AI-powered search</p><h2>Find your next role</h2></div><button class="icon-button" type="button" data-close-search aria-label="Close job search">×</button></div><p class="search-intro">Search for senior operations, transformation, change and COO opportunities across UK financial services.</p><div class="search-grid"><label class="field"><span>Keywords</span><input id="search-keywords" type="text" value="Head of Operations, Head of Transformation, COO" placeholder="e.g. Head of Operations" /></label><label class="field"><span>Location</span><input id="search-location" type="text" value="UK / London / Hybrid" placeholder="e.g. London" /></label><label class="field"><span>Minimum salary</span><input id="search-salary" type="number" value="120000" placeholder="120000" /></label><label class="field"><span>Sector</span><select id="search-sector"><option value="financial-services">Financial services</option><option value="banking">Banking</option><option value="fintech">Fintech</option><option value="payments">Payments</option><option value="lending">Lending</option><option value="all">All sectors</option></select></label></div><div class="search-actions"><button class="btn btn-primary" id="find-jobs-button" type="button">🔎 Find matching jobs</button><span class="search-status" id="search-status"></span></div><div id="search-results" class="search-results"></div></section>
+    <section class="metrics" aria-label="Opportunity summary"><article><span class="metric-label">Opportunities</span><strong id="job-count">0</strong><span class="metric-detail">roles in your pipeline</span></article><article><span class="metric-label">Excellent fit</span><strong id="excellent-count">0</strong><span class="metric-detail">worth prioritising now</span></article><article><span class="metric-label">In motion</span><strong id="active-count">0</strong><span class="metric-detail">applied or interviewing</span></article><article><span class="metric-label">Average fit</span><strong id="average-fit">0</strong><span class="metric-detail">across visible roles</span></article></section>
     <section class="content-grid">
-      <aside class="side-panel">
-        <div class="panel-heading"><p class="eyebrow">Your focus</p><h2>Ideal mandate</h2></div>
-        <div class="focus-section"><span class="focus-label">Target roles</span><div class="chip-list"><span>Head of Operations</span><span>Head of Transformation</span><span>Head of Change</span><span>Strategy &amp; Transformation</span><span>COO</span><span>Transformation Director</span></div></div>
-        <div class="focus-section"><span class="focus-label">Priority sectors</span><div class="chip-list"><span>Challenger banks</span><span>Fintech</span><span>Payments</span><span>Lenders</span><span>Financial services</span></div></div>
-        <div class="tip"><span>✦</span><p>Fit scoring looks at seniority, role alignment, sector, location and compensation.</p></div>
-      </aside>
-
-      <section class="opportunities">
-        <div class="section-header"><div><p class="eyebrow">Opportunity pipeline</p><h2>Roles to explore</h2></div><div><button class="btn btn-quiet" type="button" data-open-search>🔎 Find jobs</button> <button class="btn btn-quiet" type="button" data-open-modal>+ Add job</button></div></div>
-        <div class="filters" aria-label="Job filters">
-          <label><span>Status</span><select id="status-filter"><option value="all">All statuses</option><option>Interested</option><option>Applied</option><option>Interview</option><option>Offer</option><option>Rejected</option></select></label>
-          <label><span>Fit</span><select id="fit-filter"><option value="all">All fit scores</option><option value="Excellent">🔥 Excellent</option><option value="Strong">⭐ Strong</option><option value="Possible">👍 Possible</option><option value="Poor fit">❌ Poor fit</option></select></label>
-          <button class="clear-filters" id="clear-filters" type="button">Clear filters</button>
-        </div>
-        <div id="job-list" class="job-list" aria-live="polite"></div>
-      </section>
+      <aside class="side-panel"><div class="panel-heading"><p class="eyebrow">Your focus</p><h2>Ideal mandate</h2></div><div class="focus-section"><span class="focus-label">Target roles</span><div class="chip-list"><span>Head of Operations</span><span>Head of Transformation</span><span>Head of Change</span><span>Strategy &amp; Transformation</span><span>COO</span><span>Transformation Director</span></div></div><div class="focus-section"><span class="focus-label">Priority sectors</span><div class="chip-list"><span>Challenger banks</span><span>Fintech</span><span>Payments</span><span>Lenders</span><span>Financial services</span></div></div><div class="tip"><span>✦</span><p>Fit scoring looks at seniority, role alignment, sector, location and compensation.</p></div></aside>
+      <section class="opportunities"><div class="section-header"><div><p class="eyebrow">Opportunity pipeline</p><h2>Roles to explore</h2></div><div><button class="btn btn-quiet" type="button" data-open-search>🔎 Find jobs</button> <button class="btn btn-quiet" type="button" data-open-modal>+ Add job</button></div></div><div class="filters" aria-label="Job filters"><label><span>Status</span><select id="status-filter"><option value="all">All statuses</option><option>Interested</option><option>Applied</option><option>Interview</option><option>Offer</option><option>Rejected</option></select></label><label><span>Fit</span><select id="fit-filter"><option value="all">All fit scores</option><option value="Excellent">🔥 Excellent</option><option value="Strong">⭐ Strong</option><option value="Possible">👍 Possible</option><option value="Poor fit">❌ Poor fit</option></select></label><button class="clear-filters" id="clear-filters" type="button">Clear filters</button></div><div id="job-list" class="job-list" aria-live="polite"></div></section>
     </section>
   </main>
-
-  <dialog id="job-modal" class="modal">
-    <form id="job-form" method="dialog">
-      <div class="modal-header"><div><p class="eyebrow">Build your pipeline</p><h2>Add an opportunity</h2></div><button class="icon-button" type="button" data-close-modal aria-label="Close">×</button></div>
-      <p class="modal-intro">Add a role and we'll score it against your preferred seniority, sector, location and package.</p>
-      <div class="form-grid">
-        <label class="field full"><span>Job title <b>*</b></span><input name="title" required placeholder="e.g. Head of Operations" /></label>
-        <label class="field"><span>Company <b>*</b></span><input name="company" required placeholder="Company name" /></label>
-        <label class="field"><span>Location</span><input name="location" placeholder="e.g. London / Hybrid" /></label>
-        <label class="field"><span>Base salary</span><input name="salary" placeholder="e.g. £135,000" /></label>
-        <label class="field"><span>Job URL</span><input name="url" type="url" placeholder="https://..." /></label>
-        <label class="field full"><span>Job description</span><textarea name="description" rows="5" placeholder="Paste the key responsibilities and requirements..."></textarea></label>
-        <label class="field"><span>Status</span><select name="status"><option>Interested</option><option>Applied</option><option>Interview</option><option>Offer</option><option>Rejected</option></select></label>
-      </div>
-      <div class="modal-actions"><button class="btn btn-quiet" type="button" data-close-modal>Cancel</button><button class="btn btn-primary" type="submit">Add &amp; calculate fit</button></div>
-    </form>
-  </dialog>
-
-  <template id="job-template">
-    <article class="job-card">
-      <div class="job-main">
-        <div class="job-topline"><span class="fit-badge"></span><span class="job-status"></span></div>
-        <h3></h3>
-        <p class="company"></p>
-        <div class="job-meta"></div>
-        <p class="reason"></p>
-        <details class="job-description"><summary>View job description</summary><div class="description-body"></div></details>
-      </div>
-      <div class="job-actions">
-        <a class="job-link" target="_blank" rel="noopener">View role <span>↗</span></a>
-        <label class="status-control"><span>Pipeline status</span><select class="status-select"><option>Interested</option><option>Applied</option><option>Interview</option><option>Offer</option><option>Rejected</option></select></label>
-        <button class="delete-job" type="button">Remove</button>
-      </div>
-    </article>
-  </template>
+  <dialog id="job-modal" class="modal"><form id="job-form" method="dialog"><div class="modal-header"><div><p class="eyebrow">Build your pipeline</p><h2>Add an opportunity</h2></div><button class="icon-button" type="button" data-close-modal aria-label="Close">×</button></div><p class="modal-intro">Add a role and we'll score it against your preferred seniority, sector, location and package.</p><div class="form-grid"><label class="field full"><span>Job title <b>*</b></span><input name="title" required placeholder="e.g. Head of Operations" /></label><label class="field"><span>Company <b>*</b></span><input name="company" required placeholder="Company name" /></label><label class="field"><span>Location</span><input name="location" placeholder="e.g. London / Hybrid" /></label><label class="field"><span>Base salary</span><input name="salary" placeholder="e.g. £135,000" /></label><label class="field"><span>Job URL</span><input name="url" type="url" placeholder="https://..." /></label><label class="field full"><span>Job description</span><textarea name="description" rows="5" placeholder="Paste the key responsibilities and requirements..."></textarea></label><label class="field"><span>Status</span><select name="status"><option>Interested</option><option>Applied</option><option>Interview</option><option>Offer</option><option>Rejected</option></select></label></div><div class="modal-actions"><button class="btn btn-quiet" type="button" data-close-modal>Cancel</button><button class="btn btn-primary" type="submit">Add &amp; calculate fit</button></div></form></dialog>
+  <template id="job-template"><article class="job-card"><div class="job-main"><div class="job-topline"><span class="fit-badge"></span><span class="job-status"></span></div><h3></h3><p class="company"></p><div class="job-meta"></div><p class="reason"></p><details class="job-description"><summary>View job description</summary><div class="description-body"></div></details></div><div class="job-actions"><a class="job-link" target="_blank" rel="noopener">View role <span>↗</span></a><label class="status-control"><span>Pipeline status</span><select class="status-select"><option>Interested</option><option>Applied</option><option>Interview</option><option>Offer</option><option>Rejected</option></select></label><button class="delete-job" type="button">Remove</button></div></article></template>
   <script src="app.js"></script>
+  <script src="description-ui.js"></script>
 </body>
 </html>
