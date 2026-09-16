@@ -4,21 +4,13 @@
   const replacement = button.cloneNode(true);
   button.replaceWith(replacement);
 
-  // Use a cache-busting query so the browser never reuses an older Vercel response.
-  const API_URL = 'https://ai-job-hunter-vert.vercel.app/api/jobs';
+  // Dedicated live route: a new Vercel function deployment, avoiding any stale jobs.js route.
+  const API_URL = 'https://ai-job-hunter-vert.vercel.app/api/jobs-live';
   const searchStatus = document.querySelector('#search-status');
   const searchResults = document.querySelector('#search-results');
   const statusFilter = document.querySelector('#status-filter');
   const fitFilter = document.querySelector('#fit-filter');
-
-  const broadTitles = [
-    'Head of Operations','Director of Operations','Operations Director','Chief Operating Officer','COO',
-    'Head of Transformation','Transformation Director','Head of Change','Change Director',
-    'Head of Strategy and Transformation','Strategy and Transformation Director','Head of Business Operations',
-    'Head of Customer Operations','Head of Operational Excellence','Director of Business Operations',
-    'Director of Service Delivery','Director of Change Delivery','Director of Transformation Delivery',
-    'Head of Operating Model','Head of Continuous Improvement'
-  ];
+  const broadTitles = ['Head of Operations','Director of Operations','Operations Director','Chief Operating Officer','COO','Head of Transformation','Transformation Director','Head of Change','Change Director','Head of Strategy and Transformation','Strategy and Transformation Director','Head of Business Operations','Head of Customer Operations','Head of Operational Excellence','Director of Business Operations','Director of Service Delivery','Director of Change Delivery','Director of Transformation Delivery','Head of Operating Model','Head of Continuous Improvement'];
 
   function jobsStore(){try{return JSON.parse(localStorage.getItem('ai-job-hunter-jobs-v1'))||[]}catch{return[]}}
   function save(jobs){localStorage.setItem('ai-job-hunter-jobs-v1',JSON.stringify(jobs))}
@@ -39,7 +31,7 @@
       const text=await response.text();
       let data={};
       try{data=JSON.parse(text)}catch{throw new Error(`API returned non-JSON (${response.status}). This is a deployment/routing problem, not a job-match problem.`)}
-      if(!response.ok)throw new Error(`/api/jobs returned HTTP ${response.status}${data.error?`: ${data.error}`:''}`);
+      if(!response.ok)throw new Error(`/api/jobs-live returned HTTP ${response.status}${data.error?`: ${data.error}`:''}`);
       const jobs=Array.isArray(data.jobs)?data.jobs:[];
       if(!jobs.length){const sourceErrors=Array.isArray(data.sourceErrors)&&data.sourceErrors.length?` Source issues: ${data.sourceErrors.join(' | ')}`:'';searchStatus.textContent=`No suitable leadership roles returned.${sourceErrors}`;return}
       const enriched=jobs.map(job=>({...job,id:job.id||`job-${Date.now()}-${Math.random().toString(36).slice(2)}`,status:job.status||'Interested',score:typeof job.relevanceScore==='number'?job.relevanceScore:(job.score||0)}));
