@@ -145,10 +145,123 @@ async function handler(req, res) {
     });
   }
 
+  // Free public employer ATS feeds. These require no API keys and are queried
+  // once per employer, then filtered locally against the user's search terms.
+  const directBoards = {
+    greenhouse: [
+      { company: 'Tide', token: 'tide' }
+    ],
+    lever: [
+      { company: 'Zopa', token: 'zopa' }
+    ],
+    ashby: [
+      { company: 'Allica Bank', token: 'allica-bank' },
+      { company: 'Funding Circle', token: 'fundingcircle' },
+      { company: 'Griffin', token: 'griffin' },
+      { company: 'Lendable', token: 'lendable' },
+      { company: 'Gradient Labs', token: 'gradient-labs' },
+      { company: 'Taptap Send', token: 'TaptapSend' }
+    ]
+  };
+
+  function matchesDirectSearch(job) {
+    const haystack = normalise(`${job.title} ${job.description || ''}`);
+    const wanted = keywords.map(normalise);
+    const titleWords = new Set(haystack.split(' '));
+    const roleMatch = wanted.some(term => {
+      const words = term.split(' ').filter(Boolean);
+      return words.length && (haystack.includes(term) || words.every(word => titleWords.has(word)));
+    });
+    if (!roleMatch) return false;
+
+    if (where && !/uk|london/i.test(where)) {
+      const locationText = normalise(job.location);
+      if (locationText && !locationText.includes(normalise(where))) return false;
+    }
+
+    if (salary > 0 && typeof job.salaryMin === 'number' && job.salaryMin < salary) return false;
+    return true;
+  }
+
+  async function searchGreenhouse(board) {
+    const response = await fetch(`https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(board.token)}/jobs?content=true`, {
+      headers: { Accept: 'application/json' }
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    return (data.jobs || []).map(job => ({
+      title: job.title || 'Untitled role',
+      company: board.company,
+      location: job.location?.name || 'UK',
+      salary: extractSalaryFromText(job.content || ''),
+      salaryMin: null,
+      salaryMax: null,
+      url: job.absolute_url || '',
+      description: stripHtml(job.content || ''),
+      created: job.updated_at || '',
+      source: `Direct - ${board.company}`
+    })).filter(matchesDirectSearch);
+  }
+
+  async function searchLever(board) {
+    const response = await fetch(`https://api.lever.co/v0/postings/${encodeURIComponent(board.token)}?mode=json`, {
+      headers: { Accept: 'application/json' }
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    return (Array.isArray(data) ? data : []).map(job => ({
+      title: job.text || 'Untitled role',
+      company: board.company,
+      location: job.categories?.location || 'UK',
+      salary: job.salaryRange ? formatSalary(job.salaryRange.min, job.salaryRange.max) : 'Salary not disclosed',
+      salaryMin: typeof job.salaryRange?.min === 'number' ? job.salaryRange.min : null,
+      salaryMax: typeof job.salaryRange?.max === 'number' ? job.salaryRange.max : null,
+      url: job.hostedUrl || job.applyUrl || '',
+      description: stripHtml(job.descriptionPlain || job.description || ''),
+      created: job.createdAt ? new Date(job.createdAt).toISOString() : '',
+      source: `Direct - ${board.company}`
+    })).filter(matchesDirectSearch);
+  }
+
+  async function searchAshby(board) {
+    const response = await fetch(`https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(board.token)}?includeCompensation=true`, {
+      headers: { Accept: 'application/json' }
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    return (data.jobs || []).map(job => {
+      const compensation = job.compensation?.summaryComponents || [];
+      const salaryComponent = compensation.find(item => item.compensationType === 'Salary');
+      return {
+        title: job.title || 'Untitled role',
+        company: board.company,
+        location: job.location || 'UK',
+        salary: salaryComponent ? formatSalary(salaryComponent.minValue, salaryComponent.maxValue) : 'Salary not disclosed',
+        salaryMin: typeof salaryComponent?.minValue === 'number' ? salaryComponent.minValue : null,
+        salaryMax: typeof salaryComponent?.maxValue === 'number' ? salaryComponent.maxValue : null,
+        url: job.jobUrl || job.applyUrl || '',
+        description: stripHtml(job.description || job.summary || ''),
+        created: '',
+        source: `Direct - ${board.company}`
+      };
+    }).filter(matchesDirectSearch);
+  }
+
+  async function searchDirectEmployers() {
+    const requests = [
+      ...directBoards.greenhouse.map(searchGreenhouse),
+      ...directBoards.lever.map(searchLever),
+      ...directBoards.ashby.map(searchAshby)
+    ];
+    const settled = await Promise.allSettled(requests);
+    return settled.flatMap(result => result.status === 'fulfilled' ? result.value : []);
+  }
+
   try {
     const results = await Promise.all([
       ...keywords.map(keyword => searchAdzuna(keyword)),
       searchJooble(keywords),
+      searchDirectEmployers(),
       ...(reedApiKey ? keywords.map(keyword => searchReed(keyword)) : [])
     ]);
 
@@ -164,7 +277,7 @@ async function handler(req, res) {
       }
     }
 
-    const enabledSources = ['Adzuna'];
+    const enabledSources = ['Adzuna', 'Direct employer ATS'];
     if (joobleApiKey) enabledSources.push('Jooble');
     if (reedApiKey) enabledSources.push('Reed');
 
@@ -264,6 +377,19 @@ function formatSalary(min, max) {
   if (typeof min === 'number') return `£${Math.round(min).toLocaleString()}+`;
   if (typeof max === 'number') return `Up to £${Math.round(max).toLocaleString()}`;
   return 'Salary not disclosed';
+}
+
+function extractSalaryFromText(text) {
+  const clean = stripHtml(text);
+  const matches = [...clean.matchAll(/£\s?([0-9]{2,3}(?:,[0-9]{3})?)(?:\s?[kK])?/g)];
+  const values = matches.map(match => {
+    const value = Number(match[1].replace(/,/g, ''));
+    return /k$/i.test(match[0]) ? value * 1000 : value;
+  }).filter(value => value >= 20000);
+  if (!values.length) return 'Salary not disclosed';
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  return min === max ? `£${min.toLocaleString()}+` : `£${min.toLocaleString()} – £${max.toLocaleString()}`;
 }
 
 function stripHtml(text) {
