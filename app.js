@@ -89,9 +89,10 @@ function render() {
     if (job.description?.trim()) body.textContent = job.description.trim(); else details.remove();
     const applicationDetails = card.querySelector('.application-options'), applicationLinks = card.querySelector('.application-links');
     const options = Array.isArray(job.applyOptions) && job.applyOptions.length ? job.applyOptions : Array.isArray(job.sources) && job.sources.length ? job.sources : job.url ? [{ name: job.source || 'Apply', url: job.url }] : [];
-    if (options.length) options.forEach(option => { if (!option.url) return; const link = document.createElement('a'); link.href = option.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = `Apply via ${option.name || 'source'} ↗`; link.className = 'application-link'; applicationLinks.append(link); }); else applicationDetails.remove();
+    if (options.length) options.forEach(option => { if (!option.url) return; const link = document.createElement('a'); link.href = option.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = `Apply via ${option.name || option.source || 'source'} ↗`; link.className = 'application-link'; applicationLinks.append(link); }); else applicationDetails.remove();
     const link = card.querySelector('.job-link');
-    if (job.url) { link.href = job.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; } else { link.removeAttribute('href'); link.textContent = 'No URL added'; link.style.opacity = '.5'; }
+    const primaryUrl = job.url || options.find(option => option?.url)?.url;
+    if (primaryUrl) { link.href = primaryUrl; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'View role ↗'; } else { link.removeAttribute('href'); link.textContent = 'No application link'; link.style.opacity = '.5'; }
     const select = card.querySelector('.status-select');
     select.value = job.status || 'Interested';
     select.addEventListener('change', () => updateJob(job.id, { status: select.value }));
@@ -135,7 +136,8 @@ function mergeFetchedJobs(existing, incoming) {
     const existingSources = match.applyOptions || match.sources || (match.url ? [{ name: match.source || 'Source', url: match.url }] : []);
     const combined = [...existingSources];
     incomingSources.forEach(source => { if (source.url && !combined.some(s => s.url === source.url)) combined.push(source); });
-    match.applyOptions = combined; match.sources = combined; match.source = combined.map(s => s.name).filter(Boolean).join(' + ');
+    match.applyOptions = combined; match.sources = combined; match.source = combined.map(s => s.name || s.source).filter(Boolean).join(' + ');
+    if (!match.url && job.url) match.url = job.url;
     if ((!match.description || match.description.length < (job.description || '').length) && job.description) match.description = job.description;
     if (job.relevanceScore > (match.relevanceScore || 0)) { match.relevanceScore = job.relevanceScore; match.fitRationale = job.fitRationale; match.score = job.score; }
   }
@@ -185,4 +187,23 @@ findJobsButton.addEventListener('click', async () => {
 document.querySelector('#status-filter').addEventListener('change', render);
 document.querySelector('#fit-filter').addEventListener('change', render);
 document.querySelector('#clear-filters').addEventListener('click', () => { statusFilter.value = 'all'; fitFilter.value = 'all'; render(); });
+
+// Add a real dashboard reset without requiring an HTML change. This clears the
+// locally stored pipeline and leaves the dashboard genuinely empty until the
+// user runs a new search or adds an opportunity.
+const clearDashboard = document.createElement('button');
+clearDashboard.type = 'button';
+clearDashboard.className = 'clear-filters';
+clearDashboard.id = 'clear-dashboard';
+clearDashboard.textContent = 'Clear dashboard';
+document.querySelector('#clear-filters').insertAdjacentElement('afterend', clearDashboard);
+clearDashboard.addEventListener('click', () => {
+  if (!getJobs().length) return;
+  if (!confirm('Clear all jobs from your dashboard? This cannot be undone.')) return;
+  saveJobs([]);
+  searchResults.replaceChildren();
+  searchStatus.textContent = '';
+  render();
+});
+
 initialise(); render();
