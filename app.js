@@ -238,6 +238,17 @@ function render() {
       card.querySelector('.reason').textContent =
         explanation(job, fit);
 
+      const descriptionDetails =
+        card.querySelector('.job-description');
+      const descriptionBody =
+        card.querySelector('.description-body');
+
+      if (job.description && job.description.trim()) {
+        descriptionBody.textContent = job.description.trim();
+      } else {
+        descriptionDetails.remove();
+      }
+
       const link = card.querySelector('.job-link');
 
       if (job.url) {
@@ -419,180 +430,98 @@ const searchResults =
 
 openSearchButtons.forEach(button => {
   button.addEventListener('click', () => {
-    searchPanel.hidden = !searchPanel.hidden;
-
-    if (!searchPanel.hidden) {
-      searchPanel.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start'
-      });
-    }
+    searchPanel.hidden = false;
+    searchPanel.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start'
+    });
   });
 });
 
-async function searchJobs() {
+document
+  .querySelector('[data-close-search]')
+  .addEventListener('click', () => {
+    searchPanel.hidden = true;
+  });
+
+findJobsButton.addEventListener('click', async () => {
   const keywords =
-    document.querySelector('#search-keywords')
-      ?.value.trim() ||
-    'Head of Operations';
-
+    document.querySelector('#search-keywords').value.trim();
   const location =
-    document.querySelector('#search-location')
-      ?.value.trim() ||
-    'London';
-
+    document.querySelector('#search-location').value.trim();
   const salary =
-    Number(
-      document.querySelector('#search-salary')
-        ?.value || 120000
-    );
+    Number(document.querySelector('#search-salary').value) || 0;
+  const sector =
+    document.querySelector('#search-sector').value;
 
   findJobsButton.disabled = true;
-
-  searchStatus.textContent =
-    'Searching Adzuna for matching roles…';
-
-  searchResults.innerHTML = '';
+  searchStatus.textContent = 'Searching live jobs…';
+  searchResults.replaceChildren();
 
   try {
-    const url =
-      `${API_URL}?keywords=${encodeURIComponent(
-        keywords
-      )}&location=${encodeURIComponent(
-        location
-      )}&salary=${encodeURIComponent(
-        salary
-      )}`;
+    const params = new URLSearchParams({
+      keywords,
+      location,
+      minSalary: String(salary),
+      sector
+    });
 
-    const response = await fetch(url);
-
-    const data = await response.json();
+    const response = await fetch(
+      `${API_URL}?${params.toString()}`
+    );
 
     if (!response.ok) {
       throw new Error(
-        data.error ||
-          'The job search failed.'
+        `Search failed (${response.status})`
       );
     }
 
-    const incomingJobs =
-      (data.jobs || []).map(job => ({
-        ...job,
-        status: 'Interested',
-        score: calculateFit(job)
-      }));
+    const data = await response.json();
+    const jobs = Array.isArray(data.jobs)
+      ? data.jobs
+      : Array.isArray(data)
+        ? data
+        : [];
 
-    if (!incomingJobs.length) {
+    if (!jobs.length) {
       searchStatus.textContent =
-        'No matching jobs were found. Try broader keywords or a lower salary threshold.';
-
+        'No matching jobs found.';
       return;
     }
 
-    // Add new jobs without creating duplicates
-    const existingJobs = getJobs();
-
-    const existingUrls = new Set(
-      existingJobs
-        .map(job => job.url)
-        .filter(Boolean)
-    );
-
-    const newJobs =
-      incomingJobs.filter(
-        job =>
-          job.url &&
-          !existingUrls.has(job.url)
-      );
+    const enriched = jobs.map(job => ({
+      ...job,
+      id: job.id || `adzuna-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      status: job.status || 'Interested',
+      score: calculateFit(job)
+    }));
 
     saveJobs([
-      ...existingJobs,
-      ...newJobs
+      ...getJobs(),
+      ...enriched
     ]);
 
-    statusFilter.value = 'all';
-    fitFilter.value = 'all';
+    searchStatus.textContent =
+      `${enriched.length} matching jobs added to your pipeline.`;
 
     render();
-
-    const excellent =
-      newJobs.filter(
-        job =>
-          category(job.score) ===
-          'Excellent'
-      ).length;
-
-    const strong =
-      newJobs.filter(
-        job =>
-          category(job.score) ===
-          'Strong'
-      ).length;
-
-    searchStatus.textContent =
-      `Found ${incomingJobs.length} jobs. Added ${newJobs.length} new opportunities — ${excellent} Excellent and ${strong} Strong matches.`;
-
-    searchResults.innerHTML = `
-      <div class="search-summary">
-        <strong>${incomingJobs.length}</strong>
-        roles found from Adzuna.
-        <strong>${newJobs.length}</strong>
-        were new to your dashboard.
-      </div>
-    `;
-
   } catch (error) {
     console.error(error);
-
     searchStatus.textContent =
-      'Search failed. Please try again.';
-
-    searchResults.innerHTML = `
-      <div class="empty">
-        ${escapeHtml(
-          error.message ||
-            'Unable to search for jobs.'
-        )}
-      </div>
-    `;
+      'Unable to search right now. Check the API and try again.';
   } finally {
     findJobsButton.disabled = false;
   }
-}
-
-if (findJobsButton) {
-  findJobsButton.addEventListener(
-    'click',
-    searchJobs
-  );
-}
+});
 
 
-// -----------------------------
-// HELPERS
-// -----------------------------
+document
+  .querySelector('#status-filter')
+  .addEventListener('change', render);
 
-function escapeHtml(value) {
-  return String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
-
-// -----------------------------
-// FILTERS
-// -----------------------------
-
-[statusFilter, fitFilter].forEach(
-  filter =>
-    filter.addEventListener(
-      'change',
-      render
-    )
-);
+document
+  .querySelector('#fit-filter')
+  .addEventListener('change', render);
 
 document
   .querySelector('#clear-filters')
@@ -601,11 +530,6 @@ document
     fitFilter.value = 'all';
     render();
   });
-
-
-// -----------------------------
-// START APP
-// -----------------------------
 
 initialise();
 render();
