@@ -15,13 +15,10 @@ async function handler(req, res) {
 
   // Only allow GET requests
   if (req.method !== 'GET') {
-    res.status(405).json({
-      error: 'Method not allowed'
-    });
+    res.status(405).json({ error: 'Method not allowed' });
     return;
   }
 
-  // Read Adzuna credentials from Vercel environment variables
   const appId = process.env.ADZUNA_APP_ID;
   const appKey = process.env.ADZUNA_APP_KEY;
 
@@ -32,31 +29,19 @@ async function handler(req, res) {
     return;
   }
 
-  // Read search parameters
   const query = req.query || {};
 
-  const keywords = String(
-    query.keywords || 'Head of Operations'
-  ).trim();
+  // Support comma-separated titles, e.g.:
+  // "Head of Operations, Head of Transformation, COO"
+  const keywords = String(query.keywords || 'Head of Operations')
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean);
 
-  const location = String(
-    query.location || 'London'
-  ).trim();
+  const location = String(query.location || 'London').trim();
 
-  const salary = Number(query.salary || 0);
-
-  // Build Adzuna request
-  const params = new URLSearchParams();
-
-  params.set('app_id', appId);
-  params.set('app_key', appKey);
-  params.set('results_per_page', '30');
-  params.set('what', keywords);
-  params.set('sort_by', 'date');
-
-  if (salary > 0) {
-    params.set('salary_min', String(salary));
-  }
+  // Support both the current frontend parameter and the original API name.
+  const salary = Number(query.minSalary ?? query.salary ?? 0);
 
   // Keep the first useful location from inputs such as
   // "UK / London / Hybrid"
@@ -70,18 +55,33 @@ async function handler(req, res) {
   }
 
   if (where) {
-    params.set('where', where.split('/')[0].trim());
+    where = where.split('/')[0].trim();
   }
 
-  const adzunaUrl =
-    'https://api.adzuna.com/v1/api/jobs/gb/search/1?' +
-    params.toString();
+  // Search Adzuna separately for each title, then combine the results.
+  async function searchAdzuna(keyword) {
+    const params = new URLSearchParams();
 
-  try {
+    params.set('app_id', appId);
+    params.set('app_key', appKey);
+    params.set('results_per_page', '30');
+    params.set('what', keyword);
+    params.set('sort_by', 'date');
+
+    if (salary > 0) {
+      params.set('salary_min', String(salary));
+    }
+
+    if (where) {
+      params.set('where', where);
+    }
+
+    const adzunaUrl =
+      'https://api.adzuna.com/v1/api/jobs/gb/search/1?' +
+      params.toString();
+
     const response = await fetch(adzunaUrl, {
-      headers: {
-        Accept: 'application/json'
-      }
+      headers: { Accept: 'application/json' }
     });
 
     const responseText = await response.text();
@@ -91,79 +91,76 @@ async function handler(req, res) {
     try {
       data = JSON.parse(responseText);
     } catch {
-      res.status(502).json({
-        error: 'Adzuna returned an invalid response.',
-        status: response.status,
-        response: responseText.substring(0, 500)
-      });
-      return;
+      throw new Error(
+        `Adzuna returned an invalid response for "${keyword}".`
+      );
     }
 
     if (!response.ok) {
-      res.status(502).json({
-        error: 'Adzuna rejected the search.',
-        status: response.status,
-        details: data
-      });
-      return;
+      throw new Error(
+        `Adzuna rejected the "${keyword}" search (${response.status}).`
+      );
     }
 
-    // Convert Adzuna results into the format used by your app
-    const jobs = (data.results || []).map((job, index) => {
-      const salaryText = formatSalary(
-        job.salary_min,
-        job.salary_max
-      );
+    return data.results || [];
+  }
 
-      return {
-        id: `adzuna-${job.id || Date.now() + index}`,
+  try {
+    const resultSets = await Promise.all(
+      keywords.map(keyword => searchAdzuna(keyword))
+    );
 
-        title: job.title || 'Untitled role',
+    // Merge all title searches and remove duplicate adverts.
+    const seen = new Set();
+    const jobs = [];
 
-        company:
-          job.company && job.company.display_name
-            ? job.company.display_name
-            : 'Unknown company',
+    for (const resultSet of resultSets) {
+      for (const [index, job] of resultSet.entries()) {
+        const uniqueKey =
+          job.id ||
+          job.redirect_url ||
+          `${job.title || ''}|${job.company?.display_name || ''}`;
 
-        location:
-          job.location && job.location.display_name
-            ? job.location.display_name
-            : 'UK',
+        if (seen.has(uniqueKey)) continue;
+        seen.add(uniqueKey);
 
-        salary: salaryText,
-
-        bonus: '',
-
-        url: job.redirect_url || '',
-
-        status: 'Interested',
-
-        description: stripHtml(job.description || ''),
-
-        source: 'Adzuna',
-
-        created: job.created || '',
-
-        salaryMin:
-          typeof job.salary_min === 'number'
-            ? job.salary_min
-            : null,
-
-        salaryMax:
-          typeof job.salary_max === 'number'
-            ? job.salary_max
-            : null
-      };
-    });
+        jobs.push({
+          id: `adzuna-${job.id || Date.now() + jobs.length + index}`,
+          title: job.title || 'Untitled role',
+          company:
+            job.company && job.company.display_name
+              ? job.company.display_name
+              : 'Unknown company',
+          location:
+            job.location && job.location.display_name
+              ? job.location.display_name
+              : 'UK',
+          salary: formatSalary(job.salary_min, job.salary_max),
+          bonus: '',
+          url: job.redirect_url || '',
+          status: 'Interested',
+          description: stripHtml(job.description || ''),
+          source: 'Adzuna',
+          created: job.created || '',
+          salaryMin:
+            typeof job.salary_min === 'number'
+              ? job.salary_min
+              : null,
+          salaryMax:
+            typeof job.salary_max === 'number'
+              ? job.salary_max
+              : null
+        });
+      }
+    }
 
     res.status(200).json({
       count: jobs.length,
       jobs
     });
-
   } catch (error) {
     res.status(502).json({
-      error: 'Unable to reach Adzuna.',
+      error: 'Unable to search Adzuna.',
       details:
         error && error.message
           ? error.message
@@ -172,13 +169,8 @@ async function handler(req, res) {
   }
 }
 
-
-// Format Adzuna salary information
 function formatSalary(min, max) {
-  if (
-    typeof min === 'number' &&
-    typeof max === 'number'
-  ) {
+  if (typeof min === 'number' && typeof max === 'number') {
     return `£${Math.round(min).toLocaleString()} – £${Math.round(max).toLocaleString()}`;
   }
 
@@ -193,8 +185,6 @@ function formatSalary(min, max) {
   return 'Salary not disclosed';
 }
 
-
-// Remove HTML from Adzuna descriptions
 function stripHtml(text) {
   return String(text)
     .replace(/<[^>]*>/g, ' ')
@@ -205,7 +195,6 @@ function stripHtml(text) {
     .replace(/\s+/g, ' ')
     .trim();
 }
-
 
 // IMPORTANT:
 // Vercel is currently treating api/jobs.js as CommonJS,
