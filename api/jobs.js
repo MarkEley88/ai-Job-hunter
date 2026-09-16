@@ -79,13 +79,39 @@ async function handler(req, res) {
     }));
   }
 
+  // Curated direct employer ATS coverage. Invalid/changed boards fail quietly so one
+  // employer never breaks the wider search. The list deliberately focuses on UK
+  // banks, fintechs, payments, lenders and wealth firms relevant to the target profile.
   const directBoards = {
-    greenhouse: [{ company: 'Tide', token: 'tide' }],
-    lever: [{ company: 'Zopa', token: 'zopa' }],
+    greenhouse: [
+      { company: 'Tide', token: 'tide' },
+      { company: 'Monzo', token: 'monzo' },
+      { company: 'GoCardless', token: 'gocardless' }
+    ],
+    lever: [
+      { company: 'Zopa', token: 'zopa' },
+      { company: 'Starling Bank', token: 'starlingbank' }
+    ],
     ashby: [
-      { company: 'Allica Bank', token: 'allica-bank' }, { company: 'Funding Circle', token: 'fundingcircle' },
-      { company: 'Griffin', token: 'griffin' }, { company: 'Lendable', token: 'lendable' },
-      { company: 'Gradient Labs', token: 'gradient-labs' }, { company: 'Taptap Send', token: 'TaptapSend' }
+      { company: 'Allica Bank', token: 'allica-bank' },
+      { company: 'Funding Circle', token: 'fundingcircle' },
+      { company: 'Griffin', token: 'griffin' },
+      { company: 'Lendable', token: 'lendable' },
+      { company: 'Gradient Labs', token: 'gradient-labs' },
+      { company: 'Taptap Send', token: 'TaptapSend' },
+      { company: 'ClearBank', token: 'clearbank' },
+      { company: 'iwoca', token: 'iwoca.co.uk' },
+      { company: 'Checkout.com', token: 'checkout.com' },
+      { company: 'Modulr', token: 'modulr' },
+      { company: 'Atom bank', token: 'atom-bank' },
+      { company: 'MarketFinance', token: 'marketfinance' },
+      { company: 'OakNorth', token: 'oaknorth' },
+      { company: 'Shawbrook', token: 'shawbrook' },
+      { company: 'Wise', token: 'wise' },
+      { company: 'Revolut', token: 'revolut' },
+      { company: 'AJ Bell', token: 'aj-bell' },
+      { company: 'Hargreaves Lansdown', token: 'hargreaves-lansdown' },
+      { company: 'Close Brothers', token: 'close-brothers' }
     ]
   };
 
@@ -101,14 +127,25 @@ async function handler(req, res) {
     const response = await fetch(`https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(board.token)}/jobs?content=true`, { headers: { Accept: 'application/json' } });
     if (!response.ok) return [];
     const data = await response.json();
-    return (data.jobs || []).map(job => ({ title: job.title || 'Untitled role', company: board.company, location: job.location?.name || 'UK', salary: extractSalaryFromText(job.content || ''), salaryMin: null, salaryMax: null, url: job.absolute_url || '', description: stripHtml(job.content || ''), created: job.updated_at || '', source: `Direct - ${board.company}` })).filter(matchesDirectSearch);
+    return (data.jobs || []).map(job => ({
+      title: job.title || 'Untitled role', company: board.company, location: job.location?.name || 'UK',
+      salary: extractSalaryFromText(job.content || ''), salaryMin: null, salaryMax: null,
+      url: job.absolute_url || '', description: stripHtml(job.content || ''), created: job.updated_at || '', source: `Direct - ${board.company}`
+    })).filter(matchesDirectSearch);
   }
 
   async function searchLever(board) {
     const response = await fetch(`https://api.lever.co/v0/postings/${encodeURIComponent(board.token)}?mode=json`, { headers: { Accept: 'application/json' } });
     if (!response.ok) return [];
     const data = await response.json();
-    return (Array.isArray(data) ? data : []).map(job => ({ title: job.text || 'Untitled role', company: board.company, location: job.categories?.location || 'UK', salary: job.salaryRange ? formatSalary(job.salaryRange.min, job.salaryRange.max) : 'Salary not disclosed', salaryMin: typeof job.salaryRange?.min === 'number' ? job.salaryRange.min : null, salaryMax: typeof job.salaryRange?.max === 'number' ? job.salaryRange.max : null, url: job.hostedUrl || job.applyUrl || '', description: stripHtml(job.descriptionPlain || job.description || ''), created: job.createdAt ? new Date(job.createdAt).toISOString() : '', source: `Direct - ${board.company}` })).filter(matchesDirectSearch);
+    return (Array.isArray(data) ? data : []).map(job => ({
+      title: job.text || 'Untitled role', company: board.company, location: job.categories?.location || 'UK',
+      salary: job.salaryRange ? formatSalary(job.salaryRange.min, job.salaryRange.max) : 'Salary not disclosed',
+      salaryMin: typeof job.salaryRange?.min === 'number' ? job.salaryRange.min : null,
+      salaryMax: typeof job.salaryRange?.max === 'number' ? job.salaryRange.max : null,
+      url: job.hostedUrl || job.applyUrl || '', description: stripHtml(job.descriptionPlain || job.description || ''),
+      created: job.createdAt ? new Date(job.createdAt).toISOString() : '', source: `Direct - ${board.company}`
+    })).filter(matchesDirectSearch);
   }
 
   async function searchAshby(board) {
@@ -118,18 +155,32 @@ async function handler(req, res) {
     return (data.jobs || []).map(job => {
       const components = job.compensation?.summaryComponents || [];
       const salaryComponent = components.find(item => item.compensationType === 'Salary');
-      return { title: job.title || 'Untitled role', company: board.company, location: job.location || 'UK', salary: salaryComponent ? formatSalary(salaryComponent.minValue, salaryComponent.maxValue) : 'Salary not disclosed', salaryMin: typeof salaryComponent?.minValue === 'number' ? salaryComponent.minValue : null, salaryMax: typeof salaryComponent?.maxValue === 'number' ? salaryComponent.maxValue : null, url: job.jobUrl || job.applyUrl || '', description: stripHtml(job.description || job.summary || ''), created: '', source: `Direct - ${board.company}` };
+      return {
+        title: job.title || 'Untitled role', company: board.company, location: job.location || 'UK',
+        salary: salaryComponent ? formatSalary(salaryComponent.minValue, salaryComponent.maxValue) : 'Salary not disclosed',
+        salaryMin: typeof salaryComponent?.minValue === 'number' ? salaryComponent.minValue : null,
+        salaryMax: typeof salaryComponent?.maxValue === 'number' ? salaryComponent.maxValue : null,
+        url: job.jobUrl || job.applyUrl || '', description: stripHtml(job.description || job.summary || ''), created: '', source: `Direct - ${board.company}`
+      };
     }).filter(matchesDirectSearch);
   }
 
   async function searchDirectEmployers() {
-    const requests = [...directBoards.greenhouse.map(searchGreenhouse), ...directBoards.lever.map(searchLever), ...directBoards.ashby.map(searchAshby)];
+    const requests = [
+      ...directBoards.greenhouse.map(searchGreenhouse),
+      ...directBoards.lever.map(searchLever),
+      ...directBoards.ashby.map(searchAshby)
+    ];
     const settled = await Promise.allSettled(requests);
     return settled.flatMap(result => result.status === 'fulfilled' ? result.value : []);
   }
 
   try {
-    const sourceTasks = [...keywords.map(keyword => ({ source: 'Adzuna', promise: searchAdzuna(keyword) })), { source: 'Jooble', promise: searchJooble(keywords) }, { source: 'Direct employer ATS', promise: searchDirectEmployers() }];
+    const sourceTasks = [
+      ...keywords.map(keyword => ({ source: 'Adzuna', promise: searchAdzuna(keyword) })),
+      { source: 'Jooble', promise: searchJooble(keywords) },
+      { source: 'Direct employer ATS', promise: searchDirectEmployers() }
+    ];
     if (reedApiKey) sourceTasks.push(...keywords.map(keyword => ({ source: 'Reed', promise: searchReed(keyword) })));
 
     const settled = await Promise.allSettled(sourceTasks.map(task => task.promise));
@@ -137,15 +188,16 @@ async function handler(req, res) {
     const sourceErrors = [];
     settled.forEach((result, index) => {
       const task = sourceTasks[index];
-      if (result.status === 'rejected') { sourceErrors.push({ source: task.source, error: result.reason?.message || String(result.reason) }); return; }
+      if (result.status === 'rejected') {
+        sourceErrors.push({ source: task.source, error: result.reason?.message || String(result.reason) });
+        return;
+      }
       for (const job of result.value) {
         const existing = findMatchingJob(jobs, job);
         if (existing) mergeSource(existing, job); else jobs.push(createJob(job));
       }
     });
 
-    // Final relevance gate: retrieval stays broad, but only genuinely relevant senior
-    // operations/change/transformation titles are returned to the UI.
     const filteredJobs = jobs.filter(job => isRelevantJob(job, keywords, salary));
     filteredJobs.sort((a, b) => relevanceScore(b, keywords, salary) - relevanceScore(a, keywords, salary));
 
@@ -205,9 +257,6 @@ function isRelevantJob(job, keywords, minimumSalary) {
   const excluded = EXCLUDED_TITLE.test(title);
   const consulting = CONSULTING_TITLE.test(title);
   const disclosedBelowTarget = typeof job.salaryMin === 'number' && minimumSalary > 0 && job.salaryMin < minimumSalary;
-
-  // Title is the primary gate. Operations/change language only in the description
-  // cannot make an otherwise unrelated senior role pass.
   const strongTitle = titleTarget || requested || titleRelated;
   if (!strongTitle || !senior || excluded || consulting || disclosedBelowTarget) return false;
   if (!remit && !titleTarget && !requested) return false;
@@ -217,79 +266,81 @@ function isRelevantJob(job, keywords, minimumSalary) {
 
 function relevanceScore(job, keywords, minimumSalary) {
   const title = String(job.title || '');
-  const text = `${title} ${job.company} ${job.location || ''} ${job.description || ''}`;
-  const target = matchesAny(TARGET_ROLE_PATTERNS, title);
-  const related = matchesAny(RELATED_ROLE_PATTERNS, title);
-  const requested = requestedTitleMatch(title, keywords);
-  const finance = FIN_SERVICES.test(text);
-  const location = /\b(london|uk|united kingdom|england|hybrid|remote)\b/i.test(text);
-  const salaryOk = !(typeof job.salaryMin === 'number' && minimumSalary > 0) || job.salaryMin >= minimumSalary;
+  const text = `${title} ${job.company || ''} ${job.location || ''} ${job.description || ''}`;
   let score = 0;
-  if (target) score += 50; else if (requested || related) score += 35;
-  if (SENIORITY.test(title)) score += 20;
-  if (finance) score += 15;
-  if (OPERATIONS_REMIT.test(title)) score += 10;
-  if (location) score += 5;
-  if (salaryOk) score += 5;
-  if (CONSULTING_TITLE.test(title)) score -= 40;
-  if (EXCLUDED_TITLE.test(title)) score -= 60;
-  return Math.max(0, Math.min(100, score));
+  if (matchesAny(TARGET_ROLE_PATTERNS, title)) score += 100;
+  if (matchesAny(RELATED_ROLE_PATTERNS, title)) score += 65;
+  if (requestedTitleMatch(title, keywords)) score += 45;
+  if (/\b(strategy|strategic)\b/i.test(title)) score += 12;
+  if (/\b(financial services|banking|bank|fintech|payments|lending|regulated)\b/i.test(text)) score += 15;
+  if (/\b(target operating model|operating model|transformation|change|continuous improvement|operational excellence)\b/i.test(text)) score += 12;
+  if (typeof job.salaryMin === 'number' && minimumSalary > 0 && job.salaryMin >= minimumSalary) score += 10;
+  if (/\b(london|uk|united kingdom)\b/i.test(job.location || '')) score += 5;
+  return score;
 }
 
 function createJob(job) {
-  return { id: `job-${Date.now()}-${Math.random().toString(36).slice(2)}`, title: job.title, company: job.company, location: job.location, salary: job.salary, bonus: '', url: job.url, status: 'Interested', description: job.description, created: job.created, salaryMin: job.salaryMin, salaryMax: job.salaryMax, source: job.source, sources: job.url ? [{ name: job.source, url: job.url }] : [], applyOptions: job.url ? [{ name: job.source, url: job.url }] : [] };
+  return {
+    ...job,
+    sources: [job.source].filter(Boolean),
+    applyOptions: job.url ? [{ source: job.source, url: job.url }] : []
+  };
 }
 
-function findMatchingJob(jobs, candidate) {
-  const company = normalise(candidate.company), title = normalise(candidate.title), location = normalise(candidate.location);
-  return jobs.find(job => {
-    if (normalise(job.company) !== company) return false;
-    if (candidate.url && job.sources?.some(source => source.url === candidate.url)) return true;
-    const existingTitle = normalise(job.title), existingLocation = normalise(job.location);
-    if (existingTitle === title && existingLocation === location) return true;
-    const locationMatch = !location || !existingLocation || existingLocation.includes(location) || location.includes(existingLocation);
-    return tokenSimilarity(existingTitle, title) >= 0.8 && locationMatch;
+function mergeSource(existing, job) {
+  if (job.source && !existing.sources.includes(job.source)) existing.sources.push(job.source);
+  if (job.url && !existing.applyOptions.some(option => option.url === job.url)) {
+    existing.applyOptions.push({ source: job.source, url: job.url });
+  }
+  if ((!existing.description || existing.description.length < 160) && job.description) existing.description = job.description;
+  if (existing.salary === 'Salary not disclosed' && job.salary && job.salary !== 'Salary not disclosed') existing.salary = job.salary;
+  if (typeof existing.salaryMin !== 'number' && typeof job.salaryMin === 'number') existing.salaryMin = job.salaryMin;
+  if (typeof existing.salaryMax !== 'number' && typeof job.salaryMax === 'number') existing.salaryMax = job.salaryMax;
+  if (!existing.created && job.created) existing.created = job.created;
+}
+
+function findMatchingJob(jobs, job) {
+  const title = normalise(job.title || '');
+  const company = normalise(job.company || '');
+  const location = normalise(job.location || '');
+  if (!title || !company) return null;
+  return jobs.find(existing => {
+    const eTitle = normalise(existing.title || '');
+    const eCompany = normalise(existing.company || '');
+    const eLocation = normalise(existing.location || '');
+    if (eCompany !== company) return false;
+    if (eTitle === title) return true;
+    const titleTokens = new Set(title.split(' ').filter(Boolean));
+    const existingTokens = new Set(eTitle.split(' ').filter(Boolean));
+    const intersection = [...titleTokens].filter(token => existingTokens.has(token)).length;
+    const union = new Set([...titleTokens, ...existingTokens]).size;
+    const similarity = union ? intersection / union : 0;
+    return similarity >= 0.72 && (!location || !eLocation || location.includes(eLocation) || eLocation.includes(location));
   });
 }
 
-function mergeSource(existing, incoming) {
-  existing.sources = existing.sources || []; existing.applyOptions = existing.applyOptions || [];
-  if (incoming.url && !existing.sources.some(source => source.url === incoming.url)) existing.sources.push({ name: incoming.source, url: incoming.url });
-  existing.applyOptions = existing.sources.map(source => ({ name: source.name, url: source.url }));
-  existing.source = existing.sources.map(source => source.name).join(' + ');
-  if ((!existing.description || existing.description.length < incoming.description.length) && incoming.description) existing.description = incoming.description;
-  if ((!existing.salary || existing.salary === 'Salary not disclosed') && incoming.salary && incoming.salary !== 'Salary not disclosed') { existing.salary = incoming.salary; existing.salaryMin = incoming.salaryMin; existing.salaryMax = incoming.salaryMax; }
-  if (!existing.url && incoming.url) existing.url = incoming.url;
-  if (!existing.created && incoming.created) existing.created = incoming.created;
-}
-
 function normalise(value) {
-  return String(value || '').toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, ' ').replace(/\b(limited|ltd|plc|uk|united kingdom)\b/g, ' ').replace(/\s+/g, ' ').trim();
+  return String(value || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-function tokenSimilarity(a, b) {
-  const aTokens = new Set(a.split(' ').filter(Boolean)), bTokens = new Set(b.split(' ').filter(Boolean));
-  if (!aTokens.size || !bTokens.size) return 0;
-  const intersection = [...aTokens].filter(token => bTokens.has(token)).length;
-  const union = new Set([...aTokens, ...bTokens]).size;
-  return union ? intersection / union : 0;
+function stripHtml(value) {
+  return String(value || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&pound;/gi, '£').replace(/\s+/g, ' ').trim();
 }
 
 function formatSalary(min, max) {
-  if (typeof min === 'number' && typeof max === 'number') return `£${Math.round(min).toLocaleString()} – £${Math.round(max).toLocaleString()}`;
-  if (typeof min === 'number') return `£${Math.round(min).toLocaleString()}+`;
-  if (typeof max === 'number') return `Up to £${Math.round(max).toLocaleString()}`;
-  return 'Salary not disclosed';
+  const hasMin = typeof min === 'number' && Number.isFinite(min) && min > 0;
+  const hasMax = typeof max === 'number' && Number.isFinite(max) && max > 0;
+  if (!hasMin && !hasMax) return 'Salary not disclosed';
+  const money = value => `£${Math.round(value).toLocaleString('en-GB')}`;
+  if (hasMin && hasMax) return `${money(min)} - ${money(max)}`;
+  return money(hasMin ? min : max);
 }
 
 function extractSalaryFromText(text) {
-  const match = String(text).match(/£\s?([0-9]{2,3}(?:,[0-9]{3})?)(?:\s?[kK])?/g);
-  if (!match?.length) return 'Salary not disclosed';
-  return match.slice(0, 2).join(' – ');
-}
-
-function stripHtml(text) {
-  return String(text).replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&quot;/gi, '"').replace(/&#39;/gi, "'").replace(/\s+/g, ' ').trim();
+  const clean = stripHtml(text);
+  const match = clean.match(/£\s*([0-9]{2,3}(?:,[0-9]{3})?|[0-9]{4,6})\s*(?:-|–|to)\s*£?\s*([0-9]{2,3}(?:,[0-9]{3})?|[0-9]{4,6})/i);
+  if (!match) return 'Salary not disclosed';
+  return `£${match[1]} - £${match[2]}`;
 }
 
 module.exports = handler;
