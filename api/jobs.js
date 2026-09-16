@@ -73,13 +73,14 @@ async function handler(req, res) {
   async function searchJooble(keyword) {
     if (!joobleApiKey) return [];
 
-    const response = await fetch(`https://jooble.org/api/${encodeURIComponent(joobleApiKey)}`, {
+    // Jooble API keys are country-specific. UK keys must use the UK endpoint.
+    const response = await fetch(`https://uk.jooble.org/api/${encodeURIComponent(joobleApiKey)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
         keywords: keyword,
         location: where || 'London',
-        salary: salary > 0 ? salary : undefined,
+        ...(salary > 0 ? { salary } : {}),
         page: 1,
         ResultOnPage: 30,
         companysearch: false
