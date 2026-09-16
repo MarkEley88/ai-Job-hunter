@@ -1,15 +1,6 @@
-/* AI Job Hunter - search quality, application workflow and AI tailoring enhancements */
+/* AI Job Hunter - application workflow and AI tailoring enhancements */
 (() => {
   const TARGET_MIN = 120000;
-  const originalFetch = window.fetch.bind(window);
-  window.fetch = (input, init) => {
-    const url = typeof input === 'string' ? input : input?.url || '';
-    if (url.includes('/api/jobs')) {
-      const redirected = url.replace('/api/jobs', '/api/jobs2');
-      return originalFetch(redirected, init);
-    }
-    return originalFetch(input, init);
-  };
 
   const originalCalculateFit = window.calculateFit;
 
