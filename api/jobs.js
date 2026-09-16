@@ -24,10 +24,10 @@ async function handler(req, res) {
   }
 
   const query = req.query || {};
-  const keywords = String(query.keywords || 'Head of Operations')
+  const keywords = [...new Set(String(query.keywords || 'Head of Operations')
     .split(',')
     .map(item => item.trim())
-    .filter(Boolean);
+    .filter(Boolean))];
   const location = String(query.location || 'London').trim();
   const salary = Number(query.minSalary ?? query.salary ?? 0);
 
@@ -70,17 +70,16 @@ async function handler(req, res) {
     }));
   }
 
-  async function searchJooble(keyword) {
-    if (!joobleApiKey) return [];
+  async function searchJooble(searchKeywords) {
+    if (!joobleApiKey || !searchKeywords.length) return [];
 
-    // Jooble API keys are country-specific. UK keys must use the UK endpoint.
     const response = await fetch(`https://uk.jooble.org/api/${encodeURIComponent(joobleApiKey)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
-        keywords: keyword,
+        keywords: searchKeywords.join(', '),
         location: where || 'London',
-        ...(salary > 0 ? { salary } : {}),
+        salary: salary > 0 ? salary : undefined,
         page: 1,
         ResultOnPage: 30,
         companysearch: false
@@ -88,8 +87,8 @@ async function handler(req, res) {
     });
     const text = await response.text();
     let data;
-    try { data = JSON.parse(text); } catch { throw new Error(`Jooble returned an invalid response for "${keyword}".`); }
-    if (!response.ok) throw new Error(`Jooble rejected the "${keyword}" search (${response.status}).`);
+    try { data = JSON.parse(text); } catch { throw new Error(`Jooble returned an invalid response for "${searchKeywords.join(', ')}".`); }
+    if (!response.ok) throw new Error(`Jooble rejected the search (${response.status}).`);
 
     return (data.jobs || []).map(job => ({
       title: job.title || 'Untitled role',
@@ -147,13 +146,11 @@ async function handler(req, res) {
   }
 
   try {
-    const results = await Promise.all(
-      keywords.flatMap(keyword => [
-        searchAdzuna(keyword),
-        searchJooble(keyword),
-        searchReed(keyword)
-      ])
-    );
+    const results = await Promise.all([
+      ...keywords.map(keyword => searchAdzuna(keyword)),
+      searchJooble(keywords),
+      ...(reedApiKey ? keywords.map(keyword => searchReed(keyword)) : [])
+    ]);
 
     const jobs = [];
     for (const resultSet of results) {
