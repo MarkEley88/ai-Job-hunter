@@ -1,0 +1,31 @@
+.application-options {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0,0,0,.08);
+}
+
+.application-options summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.application-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.application-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: rgba(0,0,0,.05);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.application-link:hover {
+  text-decoration: underline;
+}
