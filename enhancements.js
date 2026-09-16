@@ -1,6 +1,16 @@
 /* AI Job Hunter - search quality, application workflow and AI tailoring enhancements */
 (() => {
   const TARGET_MIN = 120000;
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    const url = typeof input === 'string' ? input : input?.url || '';
+    if (url.includes('/api/jobs')) {
+      const redirected = url.replace('/api/jobs', '/api/jobs2');
+      return originalFetch(redirected, init);
+    }
+    return originalFetch(input, init);
+  };
+
   const originalCalculateFit = window.calculateFit;
 
   function salaryNumbers(value) {
@@ -9,13 +19,10 @@
 
   function salaryGate(job) {
     const nums = salaryNumbers(job.salary);
-    // Undisclosed compensation stays eligible; any explicitly disclosed package
-    // whose highest stated base is below the user's target is not a target match.
     if (!nums.length) return true;
     return Math.max(...nums) >= TARGET_MIN;
   }
 
-  // Tighten local/manual scoring without changing the existing UI architecture.
   window.calculateFit = function(job) {
     const score = typeof originalCalculateFit === 'function' ? originalCalculateFit(job) : 0;
     if (!salaryGate(job)) return 0;
